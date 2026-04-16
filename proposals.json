@@ -1,0 +1,650 @@
+{
+  "proposals": [
+    {
+      "id": "0f891317-930d-4543-b771-9d439d96c3c8",
+      "title": "Ribbit Rampage",
+      "description": "Ribbit Rampage is an arcade action driving survival game designed for PC, focusing on delivering a chaotic and intense gameplay experience. The project aims to create a vertical slice that showcases the core gameplay …",
+      "requirementsHash": "68b789dca569d7301b019597591abf3af4a478f2ef963d7a0985d09d62ef00b4",
+      "proposalData": {
+        "project": {
+          "name": "Ribbit Rampage",
+          "client": "Mr X",
+          "subtitle": "PC Game Development - Vertical Slice",
+          "engagementType": "Fixed-Price · Phased Delivery",
+          "version": "1.0"
+        },
+        "executiveSummary": {
+          "text": "Ribbit Rampage is an arcade action driving survival game designed for PC, focusing on delivering a chaotic and intense gameplay experience. The project aims to create a vertical slice that showcases the core gameplay mechanics, enemy interactions, and visual style. This phase will serve as a foundation for future expansions and adaptations. The project will be executed in a phased delivery approach, ensuring cost efficiency and timely delivery.",
+          "totalCost": 24000,
+          "totalTimeline": "12–16 Weeks",
+          "phaseBreakdown": [
+            {
+              "name": "Phase 1: Game Design and Planning",
+              "cost": 3000,
+              "duration": "2–3 Weeks",
+              "description": "Initial phase focusing on detailed game design, planning, and setting up the development environment."
+            },
+            {
+              "name": "Phase 2: Core Gameplay Development",
+              "cost": 8000,
+              "duration": "4–6 Weeks",
+              "description": "Development of core gameplay mechanics including driving, dodging, and enemy interactions."
+            },
+            {
+              "name": "Phase 3: Visual and Audio Integration",
+              "cost": 5000,
+              "duration": "3–4 Weeks",
+              "description": "Integration of visual elements, animations, and audio effects to enhance the game experience."
+            },
+            {
+              "name": "Phase 4: Testing and Polishing",
+              "cost": 4000,
+              "duration": "2–3 Weeks",
+              "description": "Comprehensive testing and polishing to ensure a smooth and engaging gameplay experience."
+            },
+            {
+              "name": "Phase 5: Final Review and Delivery",
+              "cost": 4000,
+              "duration": "1–2 Weeks",
+              "description": "Final review, adjustments, and delivery of the vertical slice to the client."
+            }
+          ]
+        },
+        "projectUnderstanding": {
+          "whatItIs": "Ribbit Rampage is a fast-paced arcade action driving game where players navigate through a jungle environment, avoiding attacks from frog enemies while maintaining control of their vehicle.",
+          "problemSolving": "The game provides an engaging and intense experience for players seeking quick reflex challenges and survival gameplay without complex systems.",
+          "keyFeatures": [
+            "Dynamic enemy attacks",
+            "Responsive vehicle controls",
+            "Vibrant visual style",
+            "Intense audio cues"
+          ],
+          "userTypes": [
+            {
+              "type": "Gamer",
+              "description": "Players looking for quick, intense, and engaging arcade action experiences."
+            }
+          ]
+        },
+        "objectives": {
+          "delivery": [
+            "Develop a playable vertical slice demonstrating core gameplay mechanics.",
+            "Ensure visual and audio elements enhance the chaotic gameplay experience."
+          ],
+          "successCriteria": [
+            {
+              "metric": "Gameplay Completion",
+              "target": "Player can complete the level",
+              "validationMethod": "Playtesting"
+            },
+            {
+              "metric": "Control Responsiveness",
+              "target": "Controls feel responsive and fun",
+              "validationMethod": "User feedback"
+            },
+            {
+              "metric": "Visual Readability",
+              "target": "Game is visually readable during action",
+              "validationMethod": "Visual testing"
+            }
+          ]
+        },
+        "proposedSolution": {
+          "overview": "Develop a vertical slice of Ribbit Rampage focusing on core gameplay mechanics, visual style, and audio integration to create an engaging arcade experience.",
+          "architecturePillars": [
+            {
+              "name": "Game Engine",
+              "technology": "Unity",
+              "description": "Chosen for its robust capabilities in handling 3D environments and ease of integration with various assets."
+            },
+            {
+              "name": "Asset Management",
+              "technology": "Unity Asset Store",
+              "description": "Utilize marketplace assets for environment and vehicle models to optimize costs."
+            },
+            {
+              "name": "Audio Integration",
+              "technology": "FMOD",
+              "description": "Implement dynamic audio effects to enhance gameplay intensity."
+            }
+          ]
+        },
+        "techStack": [
+          {
+            "layer": "Game Engine",
+            "technology": "Unity",
+            "justification": "Provides a comprehensive platform for developing 3D games with a wide range of tools and asset support."
+          },
+          {
+            "layer": "Audio",
+            "technology": "FMOD",
+            "justification": "Allows for dynamic and responsive audio integration, crucial for enhancing gameplay experience."
+          },
+          {
+            "layer": "Asset Management",
+            "technology": "Unity Asset Store",
+            "justification": "Offers a cost-effective solution for acquiring high-quality assets."
+          }
+        ],
+        "costEstimation": {
+          "modules": [
+            {
+              "phase": "Phase 1",
+              "name": "Game Design and Planning",
+              "features": [
+                "Game design document",
+                "Development planning",
+                "Environment setup"
+              ],
+              "baseHours": 120,
+              "aiReducedHours": 120,
+              "hoursSaved": 0,
+              "primaryRole": "Project Manager",
+              "cost": 3000,
+              "notes": "Initial planning and design to set the foundation for development."
+            },
+            {
+              "phase": "Phase 2",
+              "name": "Core Gameplay Development",
+              "features": [
+                "Driving mechanics",
+                "Enemy interactions",
+                "Health and damage system"
+              ],
+              "baseHours": 400,
+              "aiReducedHours": 400,
+              "hoursSaved": 0,
+              "primaryRole": "Backend Developer",
+              "cost": 8000,
+              "notes": "Focus on developing the core gameplay loop and interactions."
+            },
+            {
+              "phase": "Phase 3",
+              "name": "Visual and Audio Integration",
+              "features": [
+                "Visual effects",
+                "Audio cues",
+                "Animations"
+              ],
+              "baseHours": 250,
+              "aiReducedHours": 250,
+              "hoursSaved": 0,
+              "primaryRole": "UI/UX Designer",
+              "cost": 4500,
+              "notes": "Integrate visual and audio elements to enhance the game experience."
+            },
+            {
+              "phase": "Phase 4",
+              "name": "Testing and Polishing",
+              "features": [
+                "Bug fixing",
+                "Gameplay testing",
+                "Performance optimization"
+              ],
+              "baseHours": 200,
+              "aiReducedHours": 200,
+              "hoursSaved": 0,
+              "primaryRole": "QA Engineer",
+              "cost": 3000,
+              "notes": "Ensure the game is polished and free of critical bugs."
+            },
+            {
+              "phase": "Phase 5",
+              "name": "Final Review and Delivery",
+              "features": [
+                "Final adjustments",
+                "Client review",
+                "Delivery preparation"
+              ],
+              "baseHours": 160,
+              "aiReducedHours": 160,
+              "hoursSaved": 0,
+              "primaryRole": "Project Manager",
+              "cost": 4000,
+              "notes": "Prepare the vertical slice for delivery and client review."
+            }
+          ],
+          "rolesRequired": [
+            {
+              "role": "Backend Developer",
+              "rate": 20,
+              "totalHours": 400,
+              "totalCost": 8000,
+              "responsibility": "Develop core gameplay mechanics and systems.",
+              "availability": "Full-time during development phase."
+            },
+            {
+              "role": "UI/UX Designer",
+              "rate": 18,
+              "totalHours": 250,
+              "totalCost": 4500,
+              "responsibility": "Design and integrate visual and audio elements.",
+              "availability": "Part-time during integration phase."
+            },
+            {
+              "role": "QA Engineer",
+              "rate": 15,
+              "totalHours": 200,
+              "totalCost": 3000,
+              "responsibility": "Conduct testing and ensure game quality.",
+              "availability": "Part-time during testing phase."
+            },
+            {
+              "role": "Project Manager",
+              "rate": 25,
+              "totalHours": 280,
+              "totalCost": 7000,
+              "responsibility": "Oversee project planning, execution, and delivery.",
+              "availability": "Full-time throughout the project."
+            }
+          ],
+          "summary": {
+            "totalBaseHours": 1130,
+            "totalAIReducedHours": 1130,
+            "totalHoursSaved": 0,
+            "totalCost": 24000,
+            "aiSavingsAmount": 0
+          }
+        },
+        "methodology": {
+          "approach": "Agile methodology with a focus on iterative development and client feedback.",
+          "sprintLength": "2 weeks",
+          "deliveryTracks": [
+            {
+              "track": "Development",
+              "focus": "Core gameplay mechanics and systems."
+            },
+            {
+              "track": "Design",
+              "focus": "Visual and audio integration."
+            },
+            {
+              "track": "Testing",
+              "focus": "Quality assurance and bug fixing."
+            }
+          ],
+          "paymentStructure": "Milestone-based payments aligned with phase completions."
+        },
+        "risks": [
+          {
+            "risk": "Scope creep",
+            "likelihood": "Medium",
+            "impact": "High",
+            "mitigation": "Strict adherence to project scope and regular client reviews."
+          },
+          {
+            "risk": "Technical challenges with integration",
+            "likelihood": "Medium",
+            "impact": "Medium",
+            "mitigation": "Allocate buffer time for unforeseen technical issues."
+          },
+          {
+            "risk": "Resource availability",
+            "likelihood": "Low",
+            "impact": "High",
+            "mitigation": "Ensure backup resources and cross-training."
+          }
+        ],
+        "governance": {
+          "reportingCadence": [
+            "Weekly progress reports",
+            "Bi-weekly sprint reviews"
+          ],
+          "changeRequestProcess": [
+            "Formal change request documentation",
+            "Client approval required"
+          ],
+          "phaseSignOff": "Client sign-off required at the end of each phase.",
+          "escalationPath": [
+            "Project Manager",
+            "Client Liaison",
+            "Executive Sponsor"
+          ]
+        },
+        "assumptions": [
+          "Client will provide timely feedback and approvals.",
+          "No major changes in project scope during development.",
+          "Access to required assets and tools will be available."
+        ],
+        "openQuestions": [
+          "What specific game engine is preferred by the client?",
+          "Are there any specific audio or visual styles the client wants to emphasize?",
+          "Is there a preferred platform for future mobile adaptation?"
+        ]
+      },
+      "projectInfo": {
+        "projectName": "Rabbit Rampage",
+        "clientName": "Mr X",
+        "engagementType": "Fixed-Price · Phased Delivery",
+        "preparedBy": "Techfyte",
+        "version": "1.0"
+      },
+      "companyId": "techfyte",
+      "totalCost": 24000,
+      "timeline": "12–16 Weeks",
+      "createdAt": "2026-04-16T11:15:20.633Z",
+      "updatedAt": "2026-04-16T11:19:46.122Z"
+    },
+    {
+      "id": "39760228-b0a7-4cef-b2bf-f10592cdc3a4",
+      "title": "Rabbit Rampage",
+      "description": "Rabbit Rampage is an arcade action driving survival game targeting the PC platform. The game features a fast-paced, chaotic environment where players must navigate through a jungle terrain while avoiding attacks from …",
+      "requirementsHash": "68b789dca569d7301b019597591abf3af4a478f2ef963d7a0985d09d62ef00b4",
+      "proposalData": {
+        "project": {
+          "name": "Rabbit Rampage",
+          "client": "Mr X",
+          "subtitle": "PC Game Vertical Slice",
+          "engagementType": "Fixed-Price · Phased Delivery",
+          "version": "1.0"
+        },
+        "executiveSummary": {
+          "text": "Rabbit Rampage is an arcade action driving survival game targeting the PC platform. The game features a fast-paced, chaotic environment where players must navigate through a jungle terrain while avoiding attacks from various frog enemies. The project aims to deliver a vertical slice that demonstrates core gameplay mechanics, enemy interactions, and visual style. The focus is on creating a polished, playable experience that can be used for pitching and further development.",
+          "totalCost": 16800,
+          "totalTimeline": "12–16 Weeks",
+          "phaseBreakdown": [
+            {
+              "name": "Phase 1: Core Gameplay Development",
+              "cost": 7200,
+              "duration": "4–6 Weeks",
+              "description": "Development of core gameplay mechanics, including driving, dodging, and basic enemy interactions."
+            },
+            {
+              "name": "Phase 2: Visual and Audio Design",
+              "cost": 4800,
+              "duration": "3–4 Weeks",
+              "description": "Design and implementation of visual elements and audio effects to enhance the game environment and player experience."
+            },
+            {
+              "name": "Phase 3: QA and Polish",
+              "cost": 4800,
+              "duration": "3–4 Weeks",
+              "description": "Quality assurance testing and final polishing to ensure a smooth and engaging gameplay experience."
+            }
+          ]
+        },
+        "projectUnderstanding": {
+          "whatItIs": "Rabbit Rampage is a vertical slice of an arcade action driving game set in a chaotic jungle environment. Players must survive waves of attacks from frog enemies while navigating through challenging terrain.",
+          "problemSolving": "The game provides an intense and engaging experience for players seeking fast-paced action and survival challenges, filling a niche in the arcade driving genre.",
+          "keyFeatures": [
+            "Dynamic enemy attacks",
+            "Responsive driving controls",
+            "Vibrant and stylized visual design",
+            "Basic scoring and feedback system"
+          ],
+          "userTypes": [
+            {
+              "type": "Player",
+              "description": "Individuals seeking a fast-paced, arcade-style driving and survival game experience."
+            }
+          ]
+        },
+        "objectives": {
+          "delivery": [
+            "Develop a playable vertical slice demonstrating core gameplay mechanics",
+            "Ensure visual and audio elements enhance the player experience",
+            "Conduct thorough QA testing to deliver a polished product"
+          ],
+          "successCriteria": [
+            {
+              "metric": "Player Completion",
+              "target": "Level completion by players",
+              "validationMethod": "Playtesting and feedback"
+            },
+            {
+              "metric": "Control Responsiveness",
+              "target": "High player satisfaction with controls",
+              "validationMethod": "User testing and surveys"
+            },
+            {
+              "metric": "Visual Readability",
+              "target": "Clear and engaging visuals during gameplay",
+              "validationMethod": "Visual inspections and player feedback"
+            }
+          ]
+        },
+        "proposedSolution": {
+          "overview": "Develop a vertical slice of Rabbit Rampage focusing on core gameplay mechanics, visual style, and basic audio elements to create an engaging arcade experience.",
+          "architecturePillars": [
+            {
+              "name": "Game Engine",
+              "technology": "Unity",
+              "description": "Chosen for its robust support for 2D/3D games, ease of use, and community support."
+            },
+            {
+              "name": "Visual Assets",
+              "technology": "Blender",
+              "description": "Used for creating stylized 3D models and animations."
+            },
+            {
+              "name": "Audio Design",
+              "technology": "FMOD",
+              "description": "Provides dynamic audio capabilities to enhance the gaming experience."
+            }
+          ]
+        },
+        "techStack": [
+          {
+            "layer": "Game Engine",
+            "technology": "Unity",
+            "justification": "Provides a comprehensive platform for developing and deploying games across multiple platforms."
+          },
+          {
+            "layer": "3D Modeling",
+            "technology": "Blender",
+            "justification": "Allows for the creation of custom 3D models and animations."
+          },
+          {
+            "layer": "Audio",
+            "technology": "FMOD",
+            "justification": "Enables dynamic audio integration to enhance gameplay immersion."
+          }
+        ],
+        "costEstimation": {
+          "modules": [
+            {
+              "phase": "Phase 1",
+              "name": "Core Gameplay Mechanics",
+              "features": [
+                "Driving controls",
+                "Enemy attack patterns",
+                "Health and damage system"
+              ],
+              "baseHours": 200,
+              "aiReducedHours": 200,
+              "hoursSaved": 0,
+              "primaryRole": "Backend Developer",
+              "cost": 4000,
+              "notes": "Focus on implementing basic driving and enemy interaction mechanics."
+            },
+            {
+              "phase": "Phase 1",
+              "name": "Enemy Design and AI",
+              "features": [
+                "Archer Frog behavior",
+                "Bomb Frog behavior",
+                "Heavy Frog behavior"
+              ],
+              "baseHours": 150,
+              "aiReducedHours": 150,
+              "hoursSaved": 0,
+              "primaryRole": "Backend Developer",
+              "cost": 3000,
+              "notes": "Simple AI behaviors for enemy types, focusing on scripted attack sequences."
+            },
+            {
+              "phase": "Phase 2",
+              "name": "Visual Design",
+              "features": [
+                "Jungle environment",
+                "Vehicle model",
+                "Enemy models"
+              ],
+              "baseHours": 150,
+              "aiReducedHours": 150,
+              "hoursSaved": 0,
+              "primaryRole": "UI/UX Designer",
+              "cost": 2700,
+              "notes": "Creation of stylized visual assets for the game environment and characters."
+            },
+            {
+              "phase": "Phase 2",
+              "name": "Audio Design",
+              "features": [
+                "Background music",
+                "Sound effects",
+                "Audio cues for attacks"
+              ],
+              "baseHours": 100,
+              "aiReducedHours": 100,
+              "hoursSaved": 0,
+              "primaryRole": "UI/UX Designer",
+              "cost": 1800,
+              "notes": "Design and integration of audio elements to enhance gameplay immersion."
+            },
+            {
+              "phase": "Phase 3",
+              "name": "QA Testing",
+              "features": [
+                "Functional testing",
+                "Usability testing",
+                "Performance testing"
+              ],
+              "baseHours": 200,
+              "aiReducedHours": 200,
+              "hoursSaved": 0,
+              "primaryRole": "QA Engineer",
+              "cost": 3000,
+              "notes": "Comprehensive testing to ensure game stability and player satisfaction."
+            },
+            {
+              "phase": "Phase 3",
+              "name": "Polishing and Optimization",
+              "features": [
+                "Bug fixing",
+                "Performance optimization",
+                "Final adjustments"
+              ],
+              "baseHours": 120,
+              "aiReducedHours": 120,
+              "hoursSaved": 0,
+              "primaryRole": "Backend Developer",
+              "cost": 2400,
+              "notes": "Final polish to enhance gameplay experience and ensure smooth performance."
+            }
+          ],
+          "rolesRequired": [
+            {
+              "role": "Backend Developer",
+              "rate": 20,
+              "totalHours": 470,
+              "totalCost": 9400,
+              "responsibility": "Develop core gameplay mechanics and enemy AI behaviors.",
+              "availability": "Full-time during development phases."
+            },
+            {
+              "role": "UI/UX Designer",
+              "rate": 18,
+              "totalHours": 250,
+              "totalCost": 4500,
+              "responsibility": "Design visual assets and integrate audio elements.",
+              "availability": "Part-time during visual and audio design phases."
+            },
+            {
+              "role": "QA Engineer",
+              "rate": 15,
+              "totalHours": 200,
+              "totalCost": 3000,
+              "responsibility": "Conduct testing and ensure quality assurance.",
+              "availability": "Full-time during QA phase."
+            }
+          ],
+          "summary": {
+            "totalBaseHours": 820,
+            "totalAIReducedHours": 820,
+            "totalHoursSaved": 0,
+            "totalCost": 16800,
+            "aiSavingsAmount": 0
+          }
+        },
+        "methodology": {
+          "approach": "Agile development with iterative feedback and continuous integration.",
+          "sprintLength": "2 Weeks",
+          "deliveryTracks": [
+            {
+              "track": "Gameplay Development",
+              "focus": "Core mechanics and enemy interactions."
+            },
+            {
+              "track": "Design and Audio",
+              "focus": "Visual and audio asset creation and integration."
+            },
+            {
+              "track": "QA and Polish",
+              "focus": "Testing and final adjustments for a polished experience."
+            }
+          ],
+          "paymentStructure": "Milestone-based payments upon phase completion."
+        },
+        "risks": [
+          {
+            "risk": "Scope Creep",
+            "likelihood": "Medium",
+            "impact": "High",
+            "mitigation": "Strict adherence to the defined vertical slice scope and clear communication with the client."
+          },
+          {
+            "risk": "Technical Challenges",
+            "likelihood": "Medium",
+            "impact": "Medium",
+            "mitigation": "Utilize proven technologies and maintain flexibility in design choices."
+          },
+          {
+            "risk": "Resource Availability",
+            "likelihood": "Low",
+            "impact": "Medium",
+            "mitigation": "Ensure resource allocation is planned and confirmed before project commencement."
+          }
+        ],
+        "governance": {
+          "reportingCadence": [
+            "Weekly progress updates",
+            "Bi-weekly sprint reviews"
+          ],
+          "changeRequestProcess": [
+            "Formal request submission",
+            "Impact analysis and approval"
+          ],
+          "phaseSignOff": "Client approval required at the end of each phase.",
+          "escalationPath": [
+            "Project Manager",
+            "Technical Lead",
+            "Client Stakeholder"
+          ]
+        },
+        "assumptions": [
+          "The game engine will be Unity.",
+          "Marketplace assets will be used for environment and vehicle models.",
+          "The project scope is limited to a vertical slice as defined."
+        ],
+        "openQuestions": [
+          "What specific engine features are required for the vertical slice?",
+          "Are there any additional audio requirements not covered in the document?",
+          "What are the client's preferences for the visual style beyond the provided guidelines?"
+        ]
+      },
+      "projectInfo": {
+        "projectName": "Rabbit Rampage",
+        "clientName": "Mr X",
+        "engagementType": "Fixed-Price · Phased Delivery",
+        "preparedBy": "ChicMic Studios",
+        "version": "1.0"
+      },
+      "companyId": "chicmic",
+      "totalCost": 16800,
+      "timeline": "12–16 Weeks",
+      "createdAt": "2026-04-16T11:30:24.366Z",
+      "updatedAt": "2026-04-16T11:30:24.366Z"
+    }
+  ]
+}

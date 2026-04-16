@@ -1,0 +1,29 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/generate"
+  to = "/.netlify/functions/generate"
+  status = 200
+
+[[redirects]]
+  from = "/api/proposals"
+  to = "/.netlify/functions/proposals"
+  status = 200
+
+[[redirects]]
+  from = "/api/proposals/*"
+  to = "/.netlify/functions/proposals/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/google/*"
+  to = "/.netlify/functions/google/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
