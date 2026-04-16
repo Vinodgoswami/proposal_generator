@@ -81,6 +81,9 @@ const fileStore: ProposalStore = {
   },
 
   async create(data: Omit<StoredProposal, 'id' | 'createdAt' | 'updatedAt'>): Promise<StoredProposal> {
+    const existing = await fileStore.getByHash(data.requirementsHash)
+    if (existing) return existing
+
     const store = read()
     const now = new Date().toISOString()
     const proposal: StoredProposal = { id: randomUUID(), ...data, createdAt: now, updatedAt: now }
@@ -124,7 +127,7 @@ type SupabaseProposalRow = {
 
 function getSupabaseConfig(): { url: string; key: string } | null {
   const url = process.env.SUPABASE_URL?.trim()
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY)?.trim()
   if (!url || !key) return null
   return { url, key }
 }
@@ -224,6 +227,9 @@ const supabaseStore: ProposalStore = {
   },
 
   async create(data: Omit<StoredProposal, 'id' | 'createdAt' | 'updatedAt'>): Promise<StoredProposal> {
+    const existing = await supabaseStore.getByHash(data.requirementsHash)
+    if (existing) return existing
+
     const now = new Date().toISOString()
     const payload = {
       title: data.title,

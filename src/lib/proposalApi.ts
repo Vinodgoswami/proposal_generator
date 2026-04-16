@@ -15,7 +15,10 @@ export interface ProposalListResult {
 
 export async function listProposals(page = 1): Promise<ProposalListResult> {
   const res = await fetch(`/api/proposals?page=${page}`)
-  if (!res.ok) throw new Error('Failed to load history')
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed to load history' })) as { error?: string }
+    throw new Error(err.error || 'Failed to load history')
+  }
   return res.json() as Promise<ProposalListResult>
 }
 

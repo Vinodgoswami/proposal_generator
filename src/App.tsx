@@ -169,11 +169,19 @@ export default function App() {
       setIsEditing(false)
       setSavedProposalId(null)
 
-      // Save to DB in background
       const hash = await hashRequirements(requirements, projectInfo.projectName)
-      saveProposalToDb({ proposalData: data.proposal, projectInfo, companyId: company.id, requirementsHash: hash })
-        .then(saved => { if (saved) setSavedProposalId(saved.id) })
-        .catch(() => {})
+      const saved = await saveProposalToDb({
+        proposalData: data.proposal,
+        projectInfo,
+        companyId: company.id,
+        requirementsHash: hash,
+      })
+
+      if (saved) {
+        setSavedProposalId(saved.id)
+      } else {
+        setError('Proposal generated, but it could not be saved to history yet. Share link will appear after history saving works.')
+      }
 
       setTimeout(() => setStep('preview'), 600)
     } catch (e) {
