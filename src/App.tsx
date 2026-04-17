@@ -65,6 +65,17 @@ function defaultProjectInfo(company: CompanyConfig): ProjectInfo {
 
 type AppStep = 'input' | 'generating' | 'preview' | 'history' | 'share'
 
+function getShareIdFromLocation(location: Location): string | null {
+  const pathMatch = location.pathname.match(/^\/share\/([^/]+)$/)
+  if (pathMatch?.[1]) return decodeURIComponent(pathMatch[1])
+  const params = new URLSearchParams(location.search)
+  return params.get('share')
+}
+
+function buildShareUrl(id: string): string {
+  return `${window.location.origin}/share/${encodeURIComponent(id)}`
+}
+
 function PanelLoader({ label }: { label: string }) {
   return (
     <div className="flex items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-sm text-gray-500">
@@ -76,6 +87,7 @@ function PanelLoader({ label }: { label: string }) {
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const initialShareId = typeof window !== 'undefined' ? getShareIdFromLocation(window.location) : null
   const [selectedCompanyId, setSelectedCompanyId] = useState(DEFAULT_COMPANY.id)
   const [customCompany, setCustomCompany] = useState<CompanyConfig>(() => createCompanyConfig({
     id: 'custom',
@@ -86,7 +98,7 @@ export default function App() {
     email: 'hello@example.com',
     brandColor: DEFAULT_COMPANY.brandColor,
   }))
-  const [step, setStep] = useState<AppStep>('input')
+  const [step, setStep] = useState<AppStep>(initialShareId ? 'share' : 'input')
   const [uploadedRequirements, setUploadedRequirements] = useState('')
   const [uploadedRequirementsWordCount, setUploadedRequirementsWordCount] = useState(0)
   const [typedRequirements, setTypedRequirements] = useState('')
@@ -110,6 +122,7 @@ export default function App() {
   const [savedProposalId, setSavedProposalId] = useState<string | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
   const [shareData, setShareData] = useState<{ saved: SavedProposal; company: CompanyConfig } | null>(null)
+  const [shareLookupComplete, setShareLookupComplete] = useState(initialShareId === null)
   const [googleClientId, setGoogleClientId] = useState('')
   const [googleClientSecret, setGoogleClientSecret] = useState('')
   const [googleAuthStatus, setGoogleAuthStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected')
@@ -300,18 +313,21 @@ export default function App() {
   // ── Share link detection on mount ──────────────────────────────────────────
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const shareId = params.get('share')
+    const shareId = initialShareId
     if (!shareId) return
     getProposalById(shareId)
       .then((saved: SavedProposal | null) => {
-        if (!saved) return
+        if (!saved) {
+          setShareLookupComplete(true)
+          return
+        }
         const comp = resolveCompanyConfig(saved.companyId, saved.projectInfo.companySnapshot)
         setShareData({ saved, company: comp })
         setStep('share')
+        setShareLookupComplete(true)
       })
-      .catch(() => {})
-  }, [])
+      .catch(() => setShareLookupComplete(true))
+  }, [initialShareId])
 
   // ── Popover click-outside ──────────────────────────────────────────────────
 
@@ -330,7 +346,7 @@ export default function App() {
 
   function handleCopyLink() {
     if (!savedProposalId) return
-    const url = `${window.location.origin}${window.location.pathname}?share=${savedProposalId}`
+    const url = buildShareUrl(savedProposalId)
     navigator.clipboard.writeText(url).then(() => {
       setLinkCopied(true)
       setTimeout(() => setLinkCopied(false), 2500)
@@ -404,6 +420,30 @@ export default function App() {
   // ──────────────────────────────────────────────────────────────────────────
   // Render: Share view (opened via ?share=id link)
   // ──────────────────────────────────────────────────────────────────────────
+
+  if (initialShareId && !shareLookupComplete) {
+    return (
+      <div style={brandVars} className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full mx-4">
+          <PanelLoader label="Loading shared proposal..." />
+        </div>
+      </div>
+    )
+  }
+
+  if (initialShareId && !shareData) {
+    return (
+      <div style={brandVars} className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full mx-4 rounded-xl border border-red-200 bg-white p-8 text-center space-y-3">
+          <AlertCircle className="h-10 w-10 text-red-500 mx-auto" />
+          <h1 className="text-xl font-bold text-gray-900">Shared Proposal Not Found</h1>
+          <p className="text-sm text-gray-500">
+            This shared proposal link is invalid, expired, or no longer available.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   if (step === 'share' && shareData) {
     const { saved, company: shareCompany } = shareData

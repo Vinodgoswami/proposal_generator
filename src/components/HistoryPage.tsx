@@ -23,6 +23,10 @@ interface HistoryPageProps {
   isCreatingDoc: boolean
 }
 
+function buildShareUrl(id: string): string {
+  return `${window.location.origin}/share/${encodeURIComponent(id)}`
+}
+
 // ─── List card ───────────────────────────────────────────────────────────────
 
 function ProposalCard({
@@ -41,7 +45,7 @@ function ProposalCard({
 
   function handleCopyLink(e: React.MouseEvent) {
     e.stopPropagation()
-    const url = `${window.location.origin}${window.location.pathname}?share=${saved.id}`
+    const url = buildShareUrl(saved.id)
     navigator.clipboard.writeText(url).then(() => {
       setLinkCopied(true)
       setTimeout(() => setLinkCopied(false), 2500)
@@ -152,7 +156,7 @@ function DetailView({
   const company = resolveCompanyConfig(saved.companyId, saved.projectInfo.companySnapshot)
 
   function handleCopyLink() {
-    const url = `${window.location.origin}${window.location.pathname}?share=${saved.id}`
+    const url = buildShareUrl(saved.id)
     navigator.clipboard.writeText(url).then(() => {
       setLinkCopied(true)
       setTimeout(() => setLinkCopied(false), 2500)
