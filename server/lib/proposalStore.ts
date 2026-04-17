@@ -55,19 +55,19 @@ function resolveDbPath(): string {
   return existingCandidate ?? candidates[0]
 }
 
-const DB_PATH = resolveDbPath()
-
 function read(): Store {
-  if (!existsSync(DB_PATH)) return { proposals: [] }
+  const dbPath = resolveDbPath()
+  if (!existsSync(dbPath)) return { proposals: [] }
   try {
-    return JSON.parse(readFileSync(DB_PATH, 'utf-8')) as Store
+    return JSON.parse(readFileSync(dbPath, 'utf-8')) as Store
   } catch {
     return { proposals: [] }
   }
 }
 
 function write(store: Store): void {
-  writeFileSync(DB_PATH, JSON.stringify(store, null, 2))
+  const dbPath = resolveDbPath()
+  writeFileSync(dbPath, JSON.stringify(store, null, 2))
 }
 
 const fileStore: ProposalStore = {
