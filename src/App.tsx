@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import type { ProposalData, AIConfig, ProjectInfo, InputMode, TeamRates, CompanyConfig, SavedProposal } from '@/types/proposal'
+import type { ProposalData, AIConfig, ProjectInfo, TeamRates, CompanyConfig, SavedProposal } from '@/types/proposal'
 import { exportToDocx } from '@/lib/docxExporter'
 import { generateProposalHTML } from '@/lib/htmlExporter'
 import { COMPANIES, DEFAULT_COMPANY } from '@/lib/companies'
@@ -59,8 +59,8 @@ type AppStep = 'input' | 'generating' | 'preview' | 'history' | 'share'
 export default function App() {
   const [company, setCompany] = useState<CompanyConfig>(DEFAULT_COMPANY)
   const [step, setStep] = useState<AppStep>('input')
-  const [inputMode, setInputMode] = useState<InputMode>('upload')
-  const [requirements, setRequirements] = useState('')
+  const [uploadedRequirements, setUploadedRequirements] = useState('')
+  const [typedRequirements, setTypedRequirements] = useState('')
   const [projectInfo, setProjectInfo] = useState<ProjectInfo>(defaultProjectInfo(DEFAULT_COMPANY))
   const [aiConfig, setAiConfig] = useState<AIConfig>(DEFAULT_AI_CONFIG)
   const [teamRates, setTeamRates] = useState<TeamRates>(DEFAULT_TEAM_RATES)
@@ -96,6 +96,24 @@ export default function App() {
   const updateRate = (key: keyof TeamRates, val: number) =>
     setTeamRates(prev => ({ ...prev, [key]: val }))
 
+  function buildRequirements() {
+    const sections = [
+      uploadedRequirements.trim()
+        ? `Uploaded Files\n${uploadedRequirements.trim()}`
+        : '',
+      typedRequirements.trim()
+        ? `Additional Notes\n${typedRequirements.trim()}`
+        : '',
+    ].filter(Boolean)
+
+    return sections.join('\n\n')
+  }
+
+  const requirements = buildRequirements()
+  const uploadedWordCount = uploadedRequirements.split(/\s+/).filter(Boolean).length
+  const typedWordCount = typedRequirements.split(/\s+/).filter(Boolean).length
+  const totalWordCount = requirements.split(/\s+/).filter(Boolean).length
+
   function handleCompanyChange(id: string) {
     const c = COMPANIES.find(x => x.id === id) ?? DEFAULT_COMPANY
     setCompany(c)
@@ -114,7 +132,10 @@ export default function App() {
   // ── Generate ───────────────────────────────────────────────────────────────
 
   async function handleGenerate() {
-    if (!requirements.trim()) { setError('Please provide project requirements first.'); return }
+    if (!requirements.trim()) {
+      setError('Please add project requirements using file upload, pasted text, or both.')
+      return
+    }
     if (!projectInfo.projectName.trim()) { setError('Please enter a project name.'); return }
     if (!anthropicKey.trim() && !geminiKey.trim() && !openaiKey.trim()) {
       setError('Please provide at least one API key (Anthropic, Gemini, or OpenAI).')
@@ -687,37 +708,48 @@ export default function App() {
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Project Requirements</h2>
-                <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-                  <button
-                    onClick={() => setInputMode('upload')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${inputMode === 'upload' ? 'bg-brand-orange text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                  >
-                    <FileText className="h-3.5 w-3.5" /> Upload File
-                  </button>
-                  <button
-                    onClick={() => setInputMode('text')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${inputMode === 'text' ? 'bg-brand-orange text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                  >
-                    <Type className="h-3.5 w-3.5" /> Paste Text
-                  </button>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-brand-700">
+                    <FileText className="h-3.5 w-3.5" /> Upload optional
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-gray-600">
+                    <Type className="h-3.5 w-3.5" /> Text optional
+                  </span>
                 </div>
               </div>
 
-              {inputMode === 'upload' ? (
-                <FileUpload onFilesContent={(text) => setRequirements(text)} isLoading={false} />
-              ) : (
-                <Textarea
-                  placeholder="Paste your project requirements, SRS, PRD, or any project description here…"
-                  value={requirements}
-                  onChange={e => setRequirements(e.target.value)}
-                  className="min-h-[280px] font-mono text-sm resize-y"
-                />
-              )}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold text-gray-700">Upload Files</Label>
+                  <FileUpload onFilesContent={setUploadedRequirements} isLoading={false} />
+                  <p className="text-xs text-gray-500">
+                    Upload one file or multiple files. All successfully parsed files are combined and used in the proposal.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="requirementsText" className="text-xs font-semibold text-gray-700">Paste Additional Text</Label>
+                  <Textarea
+                    id="requirementsText"
+                    placeholder="Paste your project requirements, SRS, PRD, notes, or clarifications here. If you also upload files, this text will be added too."
+                    value={typedRequirements}
+                    onChange={e => setTypedRequirements(e.target.value)}
+                    className="min-h-[220px] font-mono text-sm resize-y"
+                  />
+                </div>
+              </div>
 
               {requirements && (
-                <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  {requirements.split(/\s+/).filter(Boolean).length.toLocaleString()} words loaded
+                <div className="space-y-2 rounded-lg border border-green-200 bg-green-50 px-3 py-3 text-xs text-green-800">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span>{totalWordCount.toLocaleString()} words ready for proposal generation</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pl-6 text-green-700">
+                    {uploadedRequirements && <span>{uploadedWordCount.toLocaleString()} words from uploaded files</span>}
+                    {typedRequirements && <span>{typedWordCount.toLocaleString()} words from pasted text</span>}
+                    {uploadedRequirements && typedRequirements && <span>Both sources will be merged before generation.</span>}
+                  </div>
                 </div>
               )}
 

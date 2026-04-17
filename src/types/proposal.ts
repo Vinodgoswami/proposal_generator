@@ -157,8 +157,6 @@ export interface ProjectInfo {
   version: string
 }
 
-export type InputMode = 'upload' | 'text'
-
 export interface CompanyConfig {
   id: 'chicmic' | 'techfyte'
   name: string

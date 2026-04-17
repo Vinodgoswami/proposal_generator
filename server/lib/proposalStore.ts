@@ -39,8 +39,23 @@ interface ProposalStore {
   delete(id: string): Promise<boolean>
 }
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const DB_PATH = join(__dirname, '..', '..', 'proposals.json')
+function resolveDbPath(): string {
+  const explicitPath = process.env.PROPOSALS_FILE_PATH?.trim()
+  if (explicitPath) return explicitPath
+
+  const candidates = [
+    process.cwd ? join(process.cwd(), 'proposals.json') : null,
+    typeof import.meta !== 'undefined' && import.meta.url
+      ? join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'proposals.json')
+      : null,
+    '/tmp/proposals.json',
+  ].filter((candidate): candidate is string => !!candidate)
+
+  const existingCandidate = candidates.find(candidate => existsSync(candidate))
+  return existingCandidate ?? candidates[0]
+}
+
+const DB_PATH = resolveDbPath()
 
 function read(): Store {
   if (!existsSync(DB_PATH)) return { proposals: [] }
