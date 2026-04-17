@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import type { ProposalData, AIConfig, ProjectInfo, TeamRates, CompanyConfig, SavedProposal } from '@/types/proposal'
-import { COMPANIES, DEFAULT_COMPANY } from '@/lib/companies'
+import { COMPANIES, DEFAULT_COMPANY, createCompanyConfig, resolveCompanyConfig } from '@/lib/companies'
 import { hashRequirements, checkProposalByHash, getProposalById, saveProposalToDb } from '@/lib/proposalApi'
 import {
   FileText, Type, Sparkles, Download, ChevronLeft,
@@ -59,6 +59,7 @@ function defaultProjectInfo(company: CompanyConfig): ProjectInfo {
     engagementType: 'Fixed-Price · Phased Delivery',
     preparedBy: company.name,
     version: '1.0',
+    companySnapshot: company,
   }
 }
 
@@ -75,7 +76,16 @@ function PanelLoader({ label }: { label: string }) {
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [company, setCompany] = useState<CompanyConfig>(DEFAULT_COMPANY)
+  const [selectedCompanyId, setSelectedCompanyId] = useState(DEFAULT_COMPANY.id)
+  const [customCompany, setCustomCompany] = useState<CompanyConfig>(() => createCompanyConfig({
+    id: 'custom',
+    name: 'Custom Company',
+    tagline: 'Tailored proposal delivery',
+    website: 'www.example.com',
+    phone: '+00 00000 00000',
+    email: 'hello@example.com',
+    brandColor: DEFAULT_COMPANY.brandColor,
+  }))
   const [step, setStep] = useState<AppStep>('input')
   const [uploadedRequirements, setUploadedRequirements] = useState('')
   const [uploadedRequirementsWordCount, setUploadedRequirementsWordCount] = useState(0)
@@ -106,8 +116,16 @@ export default function App() {
   const [showGoogleFields, setShowGoogleFields] = useState(false)
   const [showGooglePopover, setShowGooglePopover] = useState(false)
   const [isCreatingDoc, setIsCreatingDoc] = useState(false)
+  const [styleReferenceText, setStyleReferenceText] = useState('')
+  const [styleReferenceName, setStyleReferenceName] = useState('')
+  const [isParsingStyleReference, setIsParsingStyleReference] = useState(false)
   const authPopupRef = useRef<Window | null>(null)
   const googlePopoverRef = useRef<HTMLDivElement>(null)
+  const styleReferenceInputRef = useRef<HTMLInputElement>(null)
+
+  const company = selectedCompanyId === 'custom'
+    ? customCompany
+    : (COMPANIES.find(item => item.id === selectedCompanyId) ?? DEFAULT_COMPANY)
 
   const updateInfo = (key: keyof ProjectInfo, val: string) =>
     setProjectInfo(prev => ({ ...prev, [key]: val }))
@@ -134,9 +152,36 @@ export default function App() {
   const totalWordCount = uploadedWordCount + typedWordCount
 
   function handleCompanyChange(id: string) {
-    const c = COMPANIES.find(x => x.id === id) ?? DEFAULT_COMPANY
-    setCompany(c)
-    setProjectInfo(prev => ({ ...prev, preparedBy: c.name }))
+    setSelectedCompanyId(id)
+    const nextCompany = id === 'custom'
+      ? customCompany
+      : (COMPANIES.find(x => x.id === id) ?? DEFAULT_COMPANY)
+    setProjectInfo(prev => ({ ...prev, preparedBy: nextCompany.name, companySnapshot: nextCompany }))
+  }
+
+  function updateCustomCompany(field: keyof Pick<CompanyConfig, 'name' | 'tagline' | 'website' | 'phone' | 'email' | 'brandColor'>, value: string) {
+    const nextCompany = createCompanyConfig({
+      ...customCompany,
+      [field]: value,
+    })
+    setCustomCompany(nextCompany)
+    if (selectedCompanyId === 'custom') {
+      setProjectInfo(prev => ({ ...prev, preparedBy: nextCompany.name, companySnapshot: nextCompany }))
+    }
+  }
+
+  async function handleStyleReferenceUpload(file: File) {
+    setIsParsingStyleReference(true)
+    try {
+      const { parseFile: parseReferenceFile } = await import('@/lib/fileParser')
+      const text = await parseReferenceFile(file)
+      setStyleReferenceText(text)
+      setStyleReferenceName(file.name)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to parse reference proposal')
+    } finally {
+      setIsParsingStyleReference(false)
+    }
   }
 
   // ── Brand CSS vars ─────────────────────────────────────────────────────────
@@ -168,7 +213,7 @@ export default function App() {
     // If "generate new" is off, check DB first
     if (!generateNew) {
       setProgress(5); setProgressMsg('Checking saved proposals…')
-      const hash = await hashRequirements(requirements, projectInfo.projectName)
+      const hash = await hashRequirements(requirements, projectInfo.projectName, `${company.id}::${company.name}::${styleReferenceText}`)
       const { found, proposal: cached } = await checkProposalByHash(hash)
       if (found && cached) {
         setProgress(100); setProgressMsg('Found in history!')
@@ -199,7 +244,17 @@ export default function App() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requirements, projectInfo, aiConfig, teamRates, anthropicKey, geminiKey, openaiKey }),
+        body: JSON.stringify({
+          requirements,
+          projectInfo: { ...projectInfo, companySnapshot: company },
+          aiConfig,
+          teamRates,
+          companyProfile: company,
+          styleReferenceText,
+          anthropicKey,
+          geminiKey,
+          openaiKey,
+        }),
       })
       clearInterval(interval)
       if (!res.ok) { const err = await res.json() as { error: string }; throw new Error(err.error) }
@@ -209,10 +264,10 @@ export default function App() {
       setIsEditing(false)
       setSavedProposalId(null)
 
-      const hash = await hashRequirements(requirements, projectInfo.projectName)
+      const hash = await hashRequirements(requirements, projectInfo.projectName, `${company.id}::${company.name}::${styleReferenceText}`)
       const saved = await saveProposalToDb({
         proposalData: data.proposal,
-        projectInfo,
+        projectInfo: { ...projectInfo, companySnapshot: company },
         companyId: company.id,
         requirementsHash: hash,
       })
@@ -251,7 +306,7 @@ export default function App() {
     getProposalById(shareId)
       .then((saved: SavedProposal | null) => {
         if (!saved) return
-        const comp = COMPANIES.find(c => c.id === saved.companyId) ?? DEFAULT_COMPANY
+        const comp = resolveCompanyConfig(saved.companyId, saved.projectInfo.companySnapshot)
         setShareData({ saved, company: comp })
         setStep('share')
       })
@@ -702,6 +757,7 @@ export default function App() {
                 {COMPANIES.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
+                <option value="custom">{customCompany.name || 'Custom Company'}</option>
               </select>
               <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
                 <svg className="h-3.5 w-3.5 text-brand-orange" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -737,6 +793,69 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            {selectedCompanyId === 'custom' && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+                <h2 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Custom Company Branding</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customCompanyName">Company Name *</Label>
+                    <Input id="customCompanyName" value={customCompany.name} onChange={e => updateCustomCompany('name', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customCompanyTagline">Tagline</Label>
+                    <Input id="customCompanyTagline" value={customCompany.tagline} onChange={e => updateCustomCompany('tagline', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customCompanyWebsite">Website</Label>
+                    <Input id="customCompanyWebsite" value={customCompany.website} onChange={e => updateCustomCompany('website', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customCompanyPhone">Phone</Label>
+                    <Input id="customCompanyPhone" value={customCompany.phone} onChange={e => updateCustomCompany('phone', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customCompanyEmail">Email</Label>
+                    <Input id="customCompanyEmail" value={customCompany.email} onChange={e => updateCustomCompany('email', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customCompanyColor">Brand Color</Label>
+                    <div className="flex items-center gap-3">
+                      <Input id="customCompanyColor" type="color" value={customCompany.brandColor} onChange={e => updateCustomCompany('brandColor', e.target.value)} className="h-10 w-16 p-1" />
+                      <Input value={customCompany.brandColor} onChange={e => updateCustomCompany('brandColor', e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold text-gray-700">Previous Proposal Reference</Label>
+                  <input
+                    ref={styleReferenceInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.txt"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0]
+                      if (file) void handleStyleReferenceUpload(file)
+                    }}
+                  />
+                  <div className="flex items-center gap-3">
+                    <Button type="button" variant="outline" onClick={() => styleReferenceInputRef.current?.click()} disabled={isParsingStyleReference}>
+                      {isParsingStyleReference ? 'Parsing Reference…' : 'Upload Previous Proposal'}
+                    </Button>
+                    {styleReferenceName && <span className="text-sm text-gray-500 truncate">{styleReferenceName}</span>}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Upload an older proposal from this company to guide tone, brand voice, structure, and style. It will be used as reference only.
+                  </p>
+                  {styleReferenceText && (
+                    <div className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-700">
+                      {(styleReferenceText.split(/\s+/).filter(Boolean).length).toLocaleString()} reference words loaded from previous proposal.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Requirements */}
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">

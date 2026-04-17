@@ -155,10 +155,11 @@ export interface ProjectInfo {
   engagementType: string
   preparedBy: string
   version: string
+  companySnapshot?: CompanyConfig
 }
 
 export interface CompanyConfig {
-  id: 'chicmic' | 'techfyte'
+  id: string
   name: string
   tagline: string
   website: string

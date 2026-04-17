@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ProposalPreview } from '@/components/ProposalPreview'
 import type { SavedProposal, ProposalData, ProjectInfo, CompanyConfig } from '@/types/proposal'
-import { COMPANIES, DEFAULT_COMPANY } from '@/lib/companies'
+import { resolveCompanyConfig } from '@/lib/companies'
 import { listProposals, updateProposalInDb, deleteProposalFromDb } from '@/lib/proposalApi'
 import { exportToDocx } from '@/lib/docxExporter'
 import { generateProposalHTML } from '@/lib/htmlExporter'
@@ -34,7 +34,7 @@ function ProposalCard({
   onView: () => void
   onDelete: () => void
 }) {
-  const company = COMPANIES.find(c => c.id === saved.companyId) ?? DEFAULT_COMPANY
+  const company = resolveCompanyConfig(saved.companyId, saved.projectInfo.companySnapshot)
   const date = new Date(saved.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
   const [confirming, setConfirming] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
@@ -149,7 +149,7 @@ function DetailView({
   const [saved2, setSaved2] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
-  const company = COMPANIES.find(c => c.id === saved.companyId) ?? DEFAULT_COMPANY
+  const company = resolveCompanyConfig(saved.companyId, saved.projectInfo.companySnapshot)
 
   function handleCopyLink() {
     const url = `${window.location.origin}${window.location.pathname}?share=${saved.id}`

@@ -1,18 +1,30 @@
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages'
 const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
 
+interface CompanyProfileInput {
+  id: string
+  name: string
+  tagline: string
+  website: string
+  phone: string
+  email: string
+  brandColor: string
+}
+
 export interface GenerateProposalBody {
   requirements: string
   projectInfo: Record<string, string>
   aiConfig: Record<string, number>
   teamRates: Record<string, number>
+  companyProfile?: CompanyProfileInput
+  styleReferenceText?: string
   anthropicKey: string
   geminiKey: string
   openaiKey: string
 }
 
-export function buildSystemPrompt(): string {
-  return `You are a Senior Technical Project Manager at ChicMic Studios with 12+ years of experience delivering scalable web, mobile, AI, and blockchain products. You write high-quality, client-ready technical proposals.
+export function buildSystemPrompt(companyName: string): string {
+  return `You are a Senior Technical Project Manager writing on behalf of ${companyName} with 12+ years of experience delivering scalable web, mobile, AI, and blockchain products. You write high-quality, client-ready technical proposals.
 
 You will analyze project requirements and return ONLY valid JSON (no markdown, no explanation) matching the exact schema provided. Be thorough, consultative, and realistic.
 
@@ -32,6 +44,8 @@ export function buildUserPrompt(
   projectInfo: Record<string, string>,
   aiConfig: Record<string, number>,
   teamRates: Record<string, number>,
+  companyProfile?: CompanyProfileInput,
+  styleReferenceText?: string,
 ): string {
   const rates = {
     'Backend Developer': teamRates['Backend Developer'] ?? 20,
@@ -42,12 +56,25 @@ export function buildUserPrompt(
     'DevOps Engineer': teamRates['DevOps Engineer'] ?? 20,
   }
 
+  const styleReference = styleReferenceText?.trim()
+    ? styleReferenceText.trim().slice(0, 6000)
+    : ''
+
   return `Analyze the following project requirements and generate a comprehensive technical proposal JSON.
 
 PROJECT INFO:
 - Project Name: ${projectInfo.projectName || 'Untitled Project'}
 - Client/Prepared For: ${projectInfo.clientName || 'Client'}
 - Engagement Type: ${projectInfo.engagementType || 'Fixed-Price · Phased Delivery'}
+- Proposal Prepared By: ${projectInfo.preparedBy || companyProfile?.name || 'Delivery Partner'}
+
+DELIVERY BRAND:
+- Company Name: ${companyProfile?.name || projectInfo.preparedBy || 'Delivery Partner'}
+- Tagline: ${companyProfile?.tagline || 'Not provided'}
+- Website: ${companyProfile?.website || 'Not provided'}
+- Phone: ${companyProfile?.phone || 'Not provided'}
+- Email: ${companyProfile?.email || 'Not provided'}
+- Brand Color: ${companyProfile?.brandColor || 'Not provided'}
 
 AI EFFICIENCY FACTORS (% of hours reduced by AI assistance per category):
 ${Object.entries(aiConfig).map(([k, v]) => `- ${k}: ${v}%`).join('\n')}
@@ -57,6 +84,11 @@ ${Object.entries(rates).map(([k, v]) => `- ${k}: $${v}`).join('\n')}
 
 PROJECT REQUIREMENTS:
 ${requirements}
+
+${styleReference ? `STYLE / BRAND REFERENCE FROM A PREVIOUS PROPOSAL:
+Use this only to imitate tone, structure density, branding cues, and writing style for the same delivery company. Do not copy facts, scope, pricing, timelines, client names, or project-specific content from it.
+
+${styleReference}` : ''}
 
 Return ONLY this JSON structure (no markdown fences, no extra text):
 
@@ -271,7 +303,7 @@ async function tryWithFallbacks(
 }
 
 export async function generateProposalFromBody(body: GenerateProposalBody): Promise<{ proposal: unknown; provider: string }> {
-  const { requirements, projectInfo, aiConfig, teamRates, anthropicKey, geminiKey, openaiKey } = body
+  const { requirements, projectInfo, aiConfig, teamRates, companyProfile, styleReferenceText, anthropicKey, geminiKey, openaiKey } = body
 
   if (!requirements?.trim()) {
     throw new Error('Requirements are required')
@@ -281,8 +313,8 @@ export async function generateProposalFromBody(body: GenerateProposalBody): Prom
     throw new Error('Please provide at least one API key (Anthropic, Gemini, or OpenAI)')
   }
 
-  const systemPrompt = buildSystemPrompt()
-  const userPrompt = buildUserPrompt(requirements, projectInfo, aiConfig, teamRates ?? {})
+  const systemPrompt = buildSystemPrompt(companyProfile?.name || projectInfo.preparedBy || 'the selected delivery company')
+  const userPrompt = buildUserPrompt(requirements, projectInfo, aiConfig, teamRates ?? {}, companyProfile, styleReferenceText)
   const { text: rawText, provider } = await tryWithFallbacks(systemPrompt, userPrompt, {
     anthropicKey,
     geminiKey,

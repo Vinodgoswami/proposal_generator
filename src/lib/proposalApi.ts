@@ -1,7 +1,7 @@
 import type { SavedProposal, ProposalData, ProjectInfo } from '@/types/proposal'
 
-export async function hashRequirements(requirements: string, projectName: string): Promise<string> {
-  const text = `${requirements.trim().toLowerCase()}::${projectName.trim().toLowerCase()}`
+export async function hashRequirements(requirements: string, projectName: string, scope = ''): Promise<string> {
+  const text = `${requirements.trim().toLowerCase()}::${projectName.trim().toLowerCase()}::${scope.trim().toLowerCase()}`
   const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
   return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
