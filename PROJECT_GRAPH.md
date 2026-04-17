@@ -1,6 +1,6 @@
 # ProposalBuilder — Project Graph & Phase Tracker
 
-> Last updated: 2026-04-17 | Current branch: `staging` | Phase: **1 Complete → 2 Planning**
+> Last updated: 2026-04-17 | Current branch: `staging` | Phase: **2 In Progress**
 
 ---
 
@@ -159,7 +159,35 @@ ProposalData
 
 ---
 
-### 🔲 Phase 2 — Persistence & Auth (PLANNED)
+### 🔄 Phase 2 — Document Types (IN PROGRESS — 2026-04-17)
+
+| Feature | Status | Key Files |
+|---|---|---|
+| Document Type dropdown (Proposal / Estimate / Concept) | ✅ Done | `App.tsx` |
+| "Proposal on behalf of" moved to Project Info (5th field) | ✅ Done | `App.tsx` |
+| Estimate: AI-generated platform split estimate | ✅ Done | `server/lib/estimate.ts`, `server/routes/estimate.ts` |
+| Estimate: Excel export (Costing + Feature Breakdown tabs) | ✅ Done | `src/lib/xlsExporter.ts` |
+| Estimate: Shared backend deduplication logic | ✅ Done | AI prompt in `server/lib/estimate.ts` |
+| Estimate: In-app preview table (per-platform breakdown) | ✅ Done | `App.tsx` estimate preview section |
+| Concept: Full concept document generation | ✅ Done | `server/lib/concept.ts`, `server/routes/concept.ts` |
+| Concept: Platforms, users, journeys, architecture, tech stack | ✅ Done | AI prompt in `server/lib/concept.ts` |
+| Concept: Ballpark cost/timeline with phased breakdown | ✅ Done | `ConceptPreview.tsx` |
+| Concept: In-app rich preview | ✅ Done | `src/components/ConceptPreview.tsx` |
+| Concept: DOCX export with full 8-section document | ✅ Done | `src/lib/docxExporter.ts` (`exportConceptToDocx`) |
+| AI Effort Reduction panel hidden for Estimate/Concept | ✅ Done | `App.tsx` |
+| Generate New toggle hidden for Estimate/Concept | ✅ Done | `App.tsx` |
+
+#### New types
+- `src/types/estimate.ts` — EstimateData, EstimateFeature, PlatformCostSummary
+- `src/types/concept.ts` — ConceptData, ConceptPlatform, ConceptUserJourney, etc.
+
+#### New API endpoints (server)
+- `POST /api/generate-estimate` → `server/routes/estimate.ts`
+- `POST /api/generate-concept` → `server/routes/concept.ts`
+
+---
+
+### 🔲 Phase 2 (Remaining) — Persistence & Auth
 
 | Feature | Priority | Notes |
 |---|---|---|
@@ -168,6 +196,7 @@ ProposalData
 | Multi-company management | MED | Currently hardcoded to 2 companies |
 | Template library | MED | Save/reuse proposal section templates |
 | Proposal version history | MED | Track edits over time |
+| Save Estimates + Concepts to history | MED | Currently only Proposals are saved to DB |
 
 ---
 

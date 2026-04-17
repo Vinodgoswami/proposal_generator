@@ -1,4 +1,6 @@
-import type { SavedProposal, ProposalData, ProjectInfo } from '@/types/proposal'
+import type { SavedProposal, ProposalData, ProjectInfo, TeamRates } from '@/types/proposal'
+import type { EstimateData } from '@/types/estimate'
+import type { ConceptData } from '@/types/concept'
 
 export async function hashRequirements(requirements: string, projectName: string, scope = ''): Promise<string> {
   const text = `${requirements.trim().toLowerCase()}::${projectName.trim().toLowerCase()}::${scope.trim().toLowerCase()}`
@@ -34,6 +36,8 @@ export async function getProposalById(id: string): Promise<SavedProposal | null>
   return res.json() as Promise<SavedProposal>
 }
 
+// ── Proposal ──────────────────────────────────────────────────────────────────
+
 export async function saveProposalToDb(params: {
   proposalData: ProposalData
   projectInfo: ProjectInfo
@@ -49,6 +53,7 @@ export async function saveProposalToDb(params: {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        documentType: 'proposal',
         title: proposalData.project.name,
         description,
         requirementsHash,
@@ -91,6 +96,120 @@ export async function updateProposalInDb(
     return null
   }
 }
+
+// ── Estimate ──────────────────────────────────────────────────────────────────
+
+export async function saveEstimateToDb(params: {
+  estimateData: EstimateData
+  projectInfo: ProjectInfo
+  companyId: string
+  teamRates: TeamRates
+  requirementsHash: string
+}): Promise<SavedProposal | null> {
+  const { estimateData, projectInfo, companyId, teamRates, requirementsHash } = params
+  const description = `Split estimate across ${estimateData.platforms.join(', ')} — ${estimateData.costingSummary.grandTotalHours}h total`
+  try {
+    const res = await fetch('/api/proposals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        documentType: 'estimate',
+        title: estimateData.projectName,
+        description,
+        requirementsHash,
+        estimateData,
+        projectInfo,
+        companyId,
+        teamRates,
+        totalCost: estimateData.costingSummary.grandTotalCost,
+        timeline: estimateData.costingSummary.timeline,
+      }),
+    })
+    if (!res.ok) return null
+    return res.json() as Promise<SavedProposal>
+  } catch {
+    return null
+  }
+}
+
+export async function updateEstimateInDb(
+  id: string,
+  estimateData: EstimateData,
+): Promise<SavedProposal | null> {
+  try {
+    const res = await fetch(`/api/proposals/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        estimateData,
+        totalCost: estimateData.costingSummary.grandTotalCost,
+        timeline: estimateData.costingSummary.timeline,
+      }),
+    })
+    if (!res.ok) return null
+    return res.json() as Promise<SavedProposal>
+  } catch {
+    return null
+  }
+}
+
+// ── Concept ───────────────────────────────────────────────────────────────────
+
+export async function saveConceptToDb(params: {
+  conceptData: ConceptData
+  projectInfo: ProjectInfo
+  companyId: string
+  requirementsHash: string
+}): Promise<SavedProposal | null> {
+  const { conceptData, projectInfo, companyId, requirementsHash } = params
+  const rawDesc = conceptData.overview
+  const description = rawDesc.length > 220 ? rawDesc.slice(0, 217) + '…' : rawDesc
+  const costStr = `$${conceptData.ballparkEstimate.minCost.toLocaleString()}–$${conceptData.ballparkEstimate.maxCost.toLocaleString()}`
+  try {
+    const res = await fetch('/api/proposals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        documentType: 'concept',
+        title: conceptData.projectName,
+        description,
+        requirementsHash,
+        conceptData,
+        projectInfo,
+        companyId,
+        totalCost: conceptData.ballparkEstimate.maxCost,
+        timeline: `${conceptData.ballparkEstimate.timeline.min}–${conceptData.ballparkEstimate.timeline.max} · ${costStr}`,
+      }),
+    })
+    if (!res.ok) return null
+    return res.json() as Promise<SavedProposal>
+  } catch {
+    return null
+  }
+}
+
+export async function updateConceptInDb(
+  id: string,
+  conceptData: ConceptData,
+): Promise<SavedProposal | null> {
+  try {
+    const res = await fetch(`/api/proposals/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conceptData,
+        totalCost: conceptData.ballparkEstimate.maxCost,
+        timeline: `${conceptData.ballparkEstimate.timeline.min}–${conceptData.ballparkEstimate.timeline.max}`,
+      }),
+    })
+    if (!res.ok) return null
+    return res.json() as Promise<SavedProposal>
+  } catch {
+    return null
+  }
+}
+
+// ── Shared ────────────────────────────────────────────────────────────────────
 
 export async function deleteProposalFromDb(id: string): Promise<boolean> {
   try {

@@ -645,6 +645,378 @@
       "timeline": "12–16 Weeks",
       "createdAt": "2026-04-16T11:30:24.366Z",
       "updatedAt": "2026-04-16T11:30:24.366Z"
+    },
+    {
+      "id": "99ffdef6-2cf4-4f5b-aefc-2b89f3c677e7",
+      "title": "Plaza Event Booking",
+      "description": "Plaza Event Booking is a comprehensive digital platform for GrandHall, a luxury hotel, to streamline the process of discovering, personalizing, and booking event halls. It aims to provide a seamless experience for use…",
+      "requirementsHash": "94c4fe529986f5971cbd6c41f28ef8f8f446313d3b496da0c0e8dcbce95e2c17",
+      "conceptData": {
+        "projectName": "Plaza Event Booking",
+        "client": "Park Plaza",
+        "overview": "Plaza Event Booking is a comprehensive digital platform for GrandHall, a luxury hotel, to streamline the process of discovering, personalizing, and booking event halls. It aims to provide a seamless experience for users booking various events, including weddings, corporate functions, and kids' parties, with a focus on eliminating user frustration and ensuring clarity in every interaction.",
+        "problemStatement": "The platform addresses the challenge of efficiently booking event spaces by providing a user-friendly interface that reduces confusion and ensures transparency in pricing, availability, and options, catering to both individual and organizational needs.",
+        "targetPlatforms": [
+          {
+            "platform": "Web Application",
+            "type": "web",
+            "rationale": "Essential for broad accessibility and detailed browsing of event halls with rich media content.",
+            "targetUsers": [
+              "End Users",
+              "Event Coordinators"
+            ]
+          },
+          {
+            "platform": "Mobile Application (iOS & Android)",
+            "type": "mobile",
+            "rationale": "Provides on-the-go access for users to book and manage events, ensuring a seamless experience across devices.",
+            "targetUsers": [
+              "End Users"
+            ]
+          },
+          {
+            "platform": "Backend API",
+            "type": "backend",
+            "rationale": "Handles business logic, user authentication, and data management, ensuring secure and efficient operations.",
+            "targetUsers": [
+              "Developers",
+              "System Administrators"
+            ]
+          },
+          {
+            "platform": "Admin Portal",
+            "type": "web",
+            "rationale": "Allows hotel staff to manage bookings, update availability, and communicate with clients effectively.",
+            "targetUsers": [
+              "Hotel Staff",
+              "Admin Users"
+            ]
+          }
+        ],
+        "userTypes": [
+          {
+            "type": "End User",
+            "description": "Individuals or organizations looking to book event spaces for various occasions.",
+            "primaryPlatform": "Web Application",
+            "keyActions": [
+              "Browse event halls",
+              "Select event packages",
+              "Book and pay for events",
+              "Manage bookings"
+            ]
+          },
+          {
+            "type": "Admin User",
+            "description": "Hotel staff responsible for managing event bookings and customer interactions.",
+            "primaryPlatform": "Admin Portal",
+            "keyActions": [
+              "Manage bookings",
+              "Update availability",
+              "Communicate with clients",
+              "Oversee event details"
+            ]
+          }
+        ],
+        "userJourneys": [
+          {
+            "userType": "End User",
+            "journey": "Booking Process",
+            "steps": [
+              "Arrive at homepage",
+              "Enter guest count and date",
+              "Browse available halls",
+              "Select hall and package",
+              "Customize event",
+              "Review and pay",
+              "Receive confirmation"
+            ]
+          },
+          {
+            "userType": "End User",
+            "journey": "Post-Booking Management",
+            "steps": [
+              "Log into dashboard",
+              "View upcoming events",
+              "Modify booking details",
+              "Communicate with coordinator",
+              "Prepare for event day"
+            ]
+          },
+          {
+            "userType": "Admin User",
+            "journey": "Booking Management",
+            "steps": [
+              "Log into admin portal",
+              "View new bookings",
+              "Update hall availability",
+              "Communicate with clients",
+              "Manage event details"
+            ]
+          },
+          {
+            "userType": "Admin User",
+            "journey": "Customer Support",
+            "steps": [
+              "Receive client inquiry",
+              "Access booking details",
+              "Provide support or modification",
+              "Confirm changes with client",
+              "Log interaction"
+            ]
+          }
+        ],
+        "architectureOverview": {
+          "description": "The architecture consists of a web and mobile frontend, a robust backend API, and an admin portal for hotel staff. These components interact to provide a seamless booking experience.",
+          "components": [
+            {
+              "name": "Web Application",
+              "technology": "React",
+              "purpose": "User interface for browsing and booking event halls",
+              "communicatesWith": [
+                "Backend API"
+              ]
+            },
+            {
+              "name": "Mobile Application",
+              "technology": "React Native",
+              "purpose": "Mobile access for users to book and manage events",
+              "communicatesWith": [
+                "Backend API"
+              ]
+            },
+            {
+              "name": "Backend API",
+              "technology": "Node.js",
+              "purpose": "Handles business logic and data management",
+              "communicatesWith": [
+                "Web Application",
+                "Mobile Application",
+                "Admin Portal",
+                "Database"
+              ]
+            },
+            {
+              "name": "Admin Portal",
+              "technology": "Angular",
+              "purpose": "Management interface for hotel staff",
+              "communicatesWith": [
+                "Backend API"
+              ]
+            },
+            {
+              "name": "Database",
+              "technology": "PostgreSQL",
+              "purpose": "Stores user data, bookings, and event details",
+              "communicatesWith": [
+                "Backend API"
+              ]
+            }
+          ],
+          "dataFlow": "Data flows from the frontend applications to the backend API, which processes requests and interacts with the database to retrieve or store information. The admin portal interfaces with the backend to manage data and operations."
+        },
+        "techStack": [
+          {
+            "layer": "Mobile Frontend",
+            "recommended": "React Native",
+            "alternatives": [
+              "Flutter"
+            ],
+            "rationale": "Allows for cross-platform development, reducing time and cost while maintaining a native-like experience."
+          },
+          {
+            "layer": "Web Frontend",
+            "recommended": "React",
+            "alternatives": [
+              "Vue.js"
+            ],
+            "rationale": "Provides a robust framework for building dynamic and responsive user interfaces."
+          },
+          {
+            "layer": "Backend",
+            "recommended": "Node.js",
+            "alternatives": [
+              "Django"
+            ],
+            "rationale": "Offers a scalable solution with a large ecosystem, ideal for handling asynchronous operations and real-time data."
+          },
+          {
+            "layer": "Database",
+            "recommended": "PostgreSQL",
+            "alternatives": [
+              "MySQL"
+            ],
+            "rationale": "A powerful, open-source relational database system known for reliability and performance."
+          },
+          {
+            "layer": "DevOps",
+            "recommended": "Docker",
+            "alternatives": [
+              "Kubernetes"
+            ],
+            "rationale": "Facilitates containerization, ensuring consistent environments across development and production."
+          }
+        ],
+        "keyFeatures": [
+          {
+            "name": "User Registration & Authentication",
+            "description": "Secure user registration and login options including social sign-ins.",
+            "platforms": [
+              "Web Application",
+              "Mobile Application"
+            ],
+            "priority": "Must Have"
+          },
+          {
+            "name": "Hall Discovery & Browsing",
+            "description": "Search and filter event halls based on capacity, date, and amenities.",
+            "platforms": [
+              "Web Application",
+              "Mobile Application"
+            ],
+            "priority": "Must Have"
+          },
+          {
+            "name": "Booking Flow",
+            "description": "Step-by-step booking process from date selection to payment.",
+            "platforms": [
+              "Web Application",
+              "Mobile Application"
+            ],
+            "priority": "Must Have"
+          },
+          {
+            "name": "Kids Mode",
+            "description": "Child-safety features and add-ons for kids' events.",
+            "platforms": [
+              "Web Application",
+              "Mobile Application"
+            ],
+            "priority": "Must Have"
+          },
+          {
+            "name": "Admin Portal",
+            "description": "Interface for hotel staff to manage bookings and communicate with clients.",
+            "platforms": [
+              "Web Application"
+            ],
+            "priority": "Must Have"
+          },
+          {
+            "name": "Post-Booking Management",
+            "description": "Dashboard for users to manage and modify their bookings.",
+            "platforms": [
+              "Web Application",
+              "Mobile Application"
+            ],
+            "priority": "Must Have"
+          },
+          {
+            "name": "Payment Integration",
+            "description": "Secure payment processing with multiple options.",
+            "platforms": [
+              "Web Application",
+              "Mobile Application"
+            ],
+            "priority": "Must Have"
+          },
+          {
+            "name": "Event Package Customization",
+            "description": "Select and customize event packages and add-ons.",
+            "platforms": [
+              "Web Application",
+              "Mobile Application"
+            ],
+            "priority": "Should Have"
+          },
+          {
+            "name": "Notifications & Reminders",
+            "description": "Automated notifications for key booking milestones.",
+            "platforms": [
+              "Web Application",
+              "Mobile Application"
+            ],
+            "priority": "Should Have"
+          },
+          {
+            "name": "Review & Feedback System",
+            "description": "Allow users to leave reviews and feedback post-event.",
+            "platforms": [
+              "Web Application",
+              "Mobile Application"
+            ],
+            "priority": "Nice to Have"
+          }
+        ],
+        "ballparkEstimate": {
+          "minCost": 150000,
+          "maxCost": 250000,
+          "currency": "USD",
+          "basis": "Based on similar projects with a 4-6 developer team",
+          "timeline": {
+            "min": "6 months",
+            "max": "9 months"
+          },
+          "phases": [
+            {
+              "name": "Phase 1 — MVP",
+              "duration": "3-4 months",
+              "costRange": "$60,000–$90,000",
+              "scope": "Core booking functionality, user registration, basic admin portal"
+            },
+            {
+              "name": "Phase 2 — Full Feature Set",
+              "duration": "3-5 months",
+              "costRange": "$90,000–$160,000",
+              "scope": "Complete feature set including Kids Mode, notifications, and post-booking management"
+            }
+          ]
+        },
+        "technicalInsights": [
+          "Ensure robust data security and compliance with GDPR for user data.",
+          "Focus on responsive design to ensure usability across devices.",
+          "Implement scalable architecture to handle peak booking times."
+        ],
+        "risks": [
+          "Potential delays in obtaining third-party integrations for payment processing.",
+          "Complexity in implementing real-time availability updates across platforms."
+        ],
+        "openQuestions": [
+          "What are the specific legal requirements for child safety in event venues?",
+          "Are there any existing systems that need to be integrated with the new platform?"
+        ],
+        "nextSteps": [
+          "Conduct a detailed requirements workshop with stakeholders.",
+          "Develop a prototype to validate key user flows and gather feedback.",
+          "Finalize the technical architecture and begin development."
+        ]
+      },
+      "projectInfo": {
+        "projectName": "Plaza Event Booking",
+        "clientName": "Park Plaza",
+        "engagementType": "Fixed-Price · Phased Delivery",
+        "preparedBy": "ChicMic Studios",
+        "version": "1.0",
+        "companySnapshot": {
+          "id": "chicmic",
+          "name": "ChicMic Studios",
+          "tagline": "Building Tomorrow's Products Today",
+          "website": "www.chicmicstudios.in",
+          "phone": "+91 95014 23775",
+          "email": "hello@chicmicstudios.in",
+          "brandHex": "E86500",
+          "brandColor": "#E86500",
+          "brand50": "#FFF8F3",
+          "brand100": "#FFEDD5",
+          "brand200": "#FED7AA",
+          "brand700": "#C2440D"
+        }
+      },
+      "companyId": "chicmic",
+      "totalCost": 250000,
+      "timeline": "6 months–9 months · $150,000–$250,000",
+      "documentType": "concept",
+      "createdAt": "2026-04-17T09:31:59.376Z",
+      "updatedAt": "2026-04-17T09:31:59.376Z"
     }
   ]
 }

@@ -6,6 +6,7 @@ import {
 } from 'docx'
 import { saveAs } from 'file-saver'
 import type { ProposalData, ProjectInfo, CompanyConfig } from '../types/proposal'
+import type { ConceptData } from '../types/concept'
 import { DEFAULT_COMPANY } from './companies'
 import { formatCurrency } from './utils'
 
@@ -611,5 +612,411 @@ export async function exportToDocx(data: ProposalData, info: ProjectInfo, compan
 
   const blob = await Packer.toBlob(doc)
   const filename = `${data.project.name.replace(/\s+/g, '_')}_Proposal_v${data.project.version}.docx`
+  saveAs(blob, filename)
+}
+
+// ─── Concept DOCX Export ───────────────────────────────────────────────────────
+
+function conceptCoverPage(data: ConceptData, company: CompanyConfig): FileChild[] {
+  const COL_LABEL = 1500
+  const COL_VALUE = 3500
+  return [
+    new Paragraph({
+      children: [new TextRun({ text: company.name, bold: true, size: 28, color: BRAND, font: 'Calibri' })],
+      alignment: AlignmentType.RIGHT,
+      spacing: { before: 200, after: 80 },
+    }),
+    new Paragraph({ children: [darkText(company.website, false, 18)], alignment: AlignmentType.RIGHT }),
+    new Paragraph({ children: [darkText(company.phone, false, 18)], alignment: AlignmentType.RIGHT }),
+    new Paragraph({ children: [darkText(company.email, false, 18)], alignment: AlignmentType.RIGHT, spacing: { after: 1200 } }),
+    new Paragraph({
+      children: [new TextRun({ text: data.projectName, bold: true, size: 72, color: DARK, font: 'Calibri' })],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 200, after: 200 },
+    }),
+    new Paragraph({
+      children: [brandText('Concept Document', false, 36)],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 200 },
+    }),
+    new Paragraph({
+      children: [darkText('Platform Analysis · Architecture · User Journeys · Ballpark Estimate', false, 24)],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 2000 },
+    }),
+    new Table({
+      width: { size: COL_LABEL + COL_VALUE, type: WidthType.DXA },
+      columnWidths: [COL_LABEL, COL_VALUE],
+      rows: [
+        new TableRow({ children: [
+          new TableCell({ children: [new Paragraph({ children: [darkText('Prepared by:', true)] })], width: { size: COL_LABEL, type: WidthType.DXA }, margins: { left: 80, right: 80, top: 60, bottom: 60 } }),
+          new TableCell({ children: [new Paragraph({ children: [darkText(company.name)] })], width: { size: COL_VALUE, type: WidthType.DXA }, margins: { left: 80, right: 80, top: 60, bottom: 60 } }),
+        ]}),
+        new TableRow({ children: [
+          new TableCell({ children: [new Paragraph({ children: [darkText('Prepared for:', true)] })], width: { size: COL_LABEL, type: WidthType.DXA }, margins: { left: 80, right: 80, top: 60, bottom: 60 } }),
+          new TableCell({ children: [new Paragraph({ children: [darkText(data.client || '—')] })], width: { size: COL_VALUE, type: WidthType.DXA }, margins: { left: 80, right: 80, top: 60, bottom: 60 } }),
+        ]}),
+        new TableRow({ children: [
+          new TableCell({ children: [new Paragraph({ children: [darkText('Date:', true)] })], width: { size: COL_LABEL, type: WidthType.DXA }, margins: { left: 80, right: 80, top: 60, bottom: 60 } }),
+          new TableCell({ children: [new Paragraph({ children: [darkText(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }))] })], width: { size: COL_VALUE, type: WidthType.DXA }, margins: { left: 80, right: 80, top: 60, bottom: 60 } }),
+        ]}),
+        new TableRow({ children: [
+          new TableCell({ children: [new Paragraph({ children: [darkText('Document Type:', true)] })], width: { size: COL_LABEL, type: WidthType.DXA }, margins: { left: 80, right: 80, top: 60, bottom: 60 } }),
+          new TableCell({ children: [new Paragraph({ children: [darkText('Concept — CONFIDENTIAL')] })], width: { size: COL_VALUE, type: WidthType.DXA }, margins: { left: 80, right: 80, top: 60, bottom: 60 } }),
+        ]}),
+      ],
+    }),
+    new Paragraph({ children: [new PageBreak()] }),
+  ]
+}
+
+function conceptOverviewSection(data: ConceptData): FileChild[] {
+  return [
+    sectionHeading('01', 'Project Overview'),
+    bodyParagraph(data.overview),
+    subHeading('Problem Statement'),
+    bodyParagraph(data.problemStatement),
+    new Paragraph({ children: [new PageBreak()] }),
+  ]
+}
+
+function conceptPlatformsSection(data: ConceptData): FileChild[] {
+  const C1 = 2200, C2 = 1200, C3 = 2200, C4 = CONTENT_W - C1 - C2 - C3
+  const items: FileChild[] = [
+    sectionHeading('02', 'Target Platforms'),
+    new Table({
+      width: { size: CONTENT_W, type: WidthType.DXA },
+      columnWidths: [C1, C2, C3, C4],
+      rows: [
+        new TableRow({ children: [
+          tableHeaderCell('Platform', C1),
+          tableHeaderCell('Type', C2),
+          tableHeaderCell('Target Users', C3),
+          tableHeaderCell('Rationale', C4),
+        ]}),
+        ...data.targetPlatforms.map((p, i) => new TableRow({ children: [
+          tableBodyCell(p.platform, i % 2 === 1, true, DARK, C1),
+          tableBodyCell(p.type, i % 2 === 1, false, BRAND, C2),
+          tableBodyCell(p.targetUsers.join(', '), i % 2 === 1, false, DARK, C3),
+          tableBodyCell(p.rationale, i % 2 === 1, false, DARK, C4),
+        ]})),
+      ],
+    }),
+    new Paragraph({ children: [new PageBreak()] }),
+  ]
+  return items
+}
+
+function conceptUserTypesSection(data: ConceptData): FileChild[] {
+  const C1 = 1800, C2 = 2000, C3 = 2000, C4 = CONTENT_W - C1 - C2 - C3
+  const items: FileChild[] = [
+    sectionHeading('03', 'User Types & Journeys'),
+    subHeading('3.1 User Types'),
+    new Table({
+      width: { size: CONTENT_W, type: WidthType.DXA },
+      columnWidths: [C1, C2, C3, C4],
+      rows: [
+        new TableRow({ children: [
+          tableHeaderCell('User Type', C1),
+          tableHeaderCell('Description', C2),
+          tableHeaderCell('Primary Platform', C3),
+          tableHeaderCell('Key Actions', C4),
+        ]}),
+        ...data.userTypes.map((u, i) => new TableRow({ children: [
+          tableBodyCell(u.type, i % 2 === 1, true, DARK, C1),
+          tableBodyCell(u.description, i % 2 === 1, false, DARK, C2),
+          tableBodyCell(u.primaryPlatform, i % 2 === 1, false, BRAND, C3),
+          tableBodyCell(u.keyActions.join('\n'), i % 2 === 1, false, DARK, C4),
+        ]})),
+      ],
+    }),
+  ]
+
+  if (data.userJourneys.length > 0) {
+    items.push(subHeading('3.2 User Journeys'))
+    for (const journey of data.userJourneys) {
+      items.push(new Paragraph({
+        children: [
+          new TextRun({ text: `${journey.userType} — `, bold: true, size: 20, color: BRAND, font: 'Calibri' }),
+          new TextRun({ text: journey.journey, bold: true, size: 20, color: DARK, font: 'Calibri' }),
+        ],
+        spacing: { before: 200, after: 100 },
+      }))
+      journey.steps.forEach((step, idx) => {
+        items.push(new Paragraph({
+          children: [new TextRun({ text: `${idx + 1}.  ${step}`, size: 18, color: DARK, font: 'Calibri' })],
+          spacing: { before: 40, after: 40 },
+          indent: { left: 240 },
+        }))
+      })
+    }
+  }
+
+  items.push(new Paragraph({ children: [new PageBreak()] }))
+  return items
+}
+
+function conceptArchitectureSection(data: ConceptData): FileChild[] {
+  const arch = data.architectureOverview
+  const C1 = 1800, C2 = 1800, C3 = 2400, C4 = CONTENT_W - C1 - C2 - C3
+  const items: FileChild[] = [
+    sectionHeading('04', 'Architecture Overview'),
+    bodyParagraph(arch.description),
+    subHeading('4.1 System Components'),
+    new Table({
+      width: { size: CONTENT_W, type: WidthType.DXA },
+      columnWidths: [C1, C2, C3, C4],
+      rows: [
+        new TableRow({ children: [
+          tableHeaderCell('Component', C1),
+          tableHeaderCell('Technology', C2),
+          tableHeaderCell('Purpose', C3),
+          tableHeaderCell('Connects To', C4),
+        ]}),
+        ...arch.components.map((c, i) => new TableRow({ children: [
+          tableBodyCell(c.name, i % 2 === 1, true, DARK, C1),
+          tableBodyCell(c.technology, i % 2 === 1, false, BRAND, C2),
+          tableBodyCell(c.purpose, i % 2 === 1, false, DARK, C3),
+          tableBodyCell(c.communicatesWith.join(', '), i % 2 === 1, false, DARK, C4),
+        ]})),
+      ],
+    }),
+    subHeading('4.2 Data Flow'),
+    bodyParagraph(arch.dataFlow),
+    new Paragraph({ children: [new PageBreak()] }),
+  ]
+  return items
+}
+
+function conceptTechStackSection(data: ConceptData): FileChild[] {
+  const C1 = 2000, C2 = 2000, C3 = 2000, C4 = CONTENT_W - C1 - C2 - C3
+  return [
+    sectionHeading('05', 'Recommended Tech Stack'),
+    new Table({
+      width: { size: CONTENT_W, type: WidthType.DXA },
+      columnWidths: [C1, C2, C3, C4],
+      rows: [
+        new TableRow({ children: [
+          tableHeaderCell('Layer', C1),
+          tableHeaderCell('Recommended', C2),
+          tableHeaderCell('Alternatives', C3),
+          tableHeaderCell('Rationale', C4),
+        ]}),
+        ...data.techStack.map((t, i) => new TableRow({ children: [
+          tableBodyCell(t.layer, i % 2 === 1, true, DARK, C1),
+          tableBodyCell(t.recommended, i % 2 === 1, false, BRAND, C2),
+          tableBodyCell(t.alternatives.join(', ') || '—', i % 2 === 1, false, DARK, C3),
+          tableBodyCell(t.rationale, i % 2 === 1, false, DARK, C4),
+        ]})),
+      ],
+    }),
+    new Paragraph({ children: [new PageBreak()] }),
+  ]
+}
+
+function conceptFeaturesSection(data: ConceptData): FileChild[] {
+  const C1 = 2200, C2 = 3600, C3 = CONTENT_W - C1 - C2
+  const priorities = ['Must Have', 'Should Have', 'Nice to Have'] as const
+  const items: FileChild[] = [sectionHeading('06', 'Key Features')]
+
+  for (const priority of priorities) {
+    const features = data.keyFeatures.filter(f => f.priority === priority)
+    if (features.length === 0) continue
+    items.push(subHeading(priority))
+    items.push(new Table({
+      width: { size: CONTENT_W, type: WidthType.DXA },
+      columnWidths: [C1, C2, C3],
+      rows: [
+        new TableRow({ children: [
+          tableHeaderCell('Feature', C1),
+          tableHeaderCell('Description', C2),
+          tableHeaderCell('Platforms', C3),
+        ]}),
+        ...features.map((f, i) => new TableRow({ children: [
+          tableBodyCell(f.name, i % 2 === 1, true, DARK, C1),
+          tableBodyCell(f.description, i % 2 === 1, false, DARK, C2),
+          tableBodyCell(f.platforms.join(', '), i % 2 === 1, false, BRAND, C3),
+        ]})),
+      ],
+    }))
+    items.push(new Paragraph({ spacing: { before: 120 } }))
+  }
+
+  items.push(new Paragraph({ children: [new PageBreak()] }))
+  return items
+}
+
+function conceptEstimateSection(data: ConceptData): FileChild[] {
+  const est = data.ballparkEstimate
+  const C1 = Math.floor(CONTENT_W / 4)
+  const C2 = Math.floor(CONTENT_W / 4)
+  const C3 = Math.floor(CONTENT_W / 4)
+  const C4 = CONTENT_W - C1 - C2 - C3
+
+  const items: FileChild[] = [
+    sectionHeading('07', 'Ballpark Estimate'),
+    // KPI row
+    new Table({
+      width: { size: CONTENT_W, type: WidthType.DXA },
+      columnWidths: [C1, C2, C3, C4],
+      rows: [
+        new TableRow({ children: [
+          tableHeaderCell('ESTIMATED COST (MIN)', C1),
+          tableHeaderCell('ESTIMATED COST (MAX)', C2),
+          tableHeaderCell('TIMELINE MIN', C3),
+          tableHeaderCell('TIMELINE MAX', C4),
+        ]}),
+        new TableRow({ children: [
+          tableBodyCell(`${est.currency} ${est.minCost.toLocaleString()}`, false, true, BRAND, C1),
+          tableBodyCell(`${est.currency} ${est.maxCost.toLocaleString()}`, false, true, BRAND, C2),
+          tableBodyCell(est.timeline.min, false, true, DARK, C3),
+          tableBodyCell(est.timeline.max, false, true, DARK, C4),
+        ]}),
+      ],
+    }),
+    new Paragraph({ spacing: { before: 120 } }),
+    new Paragraph({
+      children: [
+        new TextRun({ text: 'Basis: ', bold: true, size: 18, color: BRAND, font: 'Calibri' }),
+        new TextRun({ text: est.basis, size: 18, color: DARK, font: 'Calibri' }),
+      ],
+      spacing: { before: 80, after: 200 },
+    }),
+    subHeading('Phased Breakdown'),
+  ]
+
+  if (est.phases.length > 0) {
+    const PC1 = 2400, PC2 = 1600, PC3 = 1600, PC4 = CONTENT_W - PC1 - PC2 - PC3
+    items.push(new Table({
+      width: { size: CONTENT_W, type: WidthType.DXA },
+      columnWidths: [PC1, PC2, PC3, PC4],
+      rows: [
+        new TableRow({ children: [
+          tableHeaderCell('Phase', PC1),
+          tableHeaderCell('Duration', PC2),
+          tableHeaderCell('Cost Range', PC3),
+          tableHeaderCell('Scope', PC4),
+        ]}),
+        ...est.phases.map((p, i) => new TableRow({ children: [
+          tableBodyCell(p.name, i % 2 === 1, true, DARK, PC1),
+          tableBodyCell(p.duration, i % 2 === 1, false, BRAND, PC2),
+          tableBodyCell(p.costRange, i % 2 === 1, true, BRAND, PC3),
+          tableBodyCell(p.scope, i % 2 === 1, false, DARK, PC4),
+        ]})),
+      ],
+    }))
+  }
+
+  items.push(new Paragraph({ children: [new PageBreak()] }))
+  return items
+}
+
+function conceptInsightsSection(data: ConceptData, company: CompanyConfig): FileChild[] {
+  const items: FileChild[] = [
+    sectionHeading('08', 'Insights, Risks & Next Steps'),
+  ]
+
+  if (data.technicalInsights.length > 0) {
+    items.push(subHeading('Technical Insights'))
+    items.push(...data.technicalInsights.map(t => bulletPoint(t)))
+  }
+  if (data.risks.length > 0) {
+    items.push(subHeading('Risks to Consider'))
+    items.push(...data.risks.map(r => bulletPoint(r)))
+  }
+  if (data.openQuestions.length > 0) {
+    items.push(subHeading('Open Questions'))
+    items.push(...data.openQuestions.map(q => bulletPoint(q)))
+  }
+  if (data.nextSteps.length > 0) {
+    items.push(subHeading('Recommended Next Steps'))
+    data.nextSteps.forEach((step, idx) => {
+      items.push(new Paragraph({
+        children: [new TextRun({ text: `${idx + 1}.  ${step}`, size: 18, color: DARK, font: 'Calibri' })],
+        spacing: { before: 40, after: 40 },
+        indent: { left: 240 },
+      }))
+    })
+  }
+
+  items.push(new Paragraph({ spacing: { before: 800 } }))
+  items.push(new Paragraph({
+    children: [new TextRun({ text: `Thank you for the opportunity to explore ${data.projectName}.`, bold: true, size: 22, color: DARK, font: 'Calibri' })],
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 400 },
+  }))
+  items.push(new Paragraph({
+    children: [new TextRun({ text: company.tagline, italics: true, size: 20, color: BRAND, font: 'Calibri' })],
+    alignment: AlignmentType.CENTER,
+  }))
+
+  return items
+}
+
+export async function exportConceptToDocx(data: ConceptData, info: ProjectInfo, company: CompanyConfig = DEFAULT_COMPANY): Promise<void> {
+  BRAND = company.brandHex
+  ALT_ROW = company.brand50.replace('#', '')
+  LIGHT_BG = company.brand50.replace('#', '')
+
+  const allSections: FileChild[] = [
+    ...conceptCoverPage(data, company),
+    ...conceptOverviewSection(data),
+    ...conceptPlatformsSection(data),
+    ...conceptUserTypesSection(data),
+    ...conceptArchitectureSection(data),
+    ...conceptTechStackSection(data),
+    ...conceptFeaturesSection(data),
+    ...conceptEstimateSection(data),
+    ...conceptInsightsSection(data, company),
+  ]
+
+  const doc = new Document({
+    sections: [{
+      properties: {
+        page: {
+          size: { width: 12240, height: 15840 },
+          margin: {
+            top: convertInchesToTwip(1),
+            bottom: convertInchesToTwip(0.8),
+            left: convertInchesToTwip(1),
+            right: convertInchesToTwip(1),
+          },
+        },
+      },
+      headers: {
+        default: new Header({
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({ text: company.name, bold: true, size: 16, color: BRAND, font: 'Calibri' }),
+                new TextRun({ text: '    |    ', size: 16, color: BORDER_COLOR, font: 'Calibri' }),
+                new TextRun({ text: `${data.projectName} — Concept`, size: 16, color: DARK, font: 'Calibri' }),
+              ],
+              alignment: AlignmentType.RIGHT,
+              border: { bottom: { color: BORDER_COLOR, size: 4, style: BorderStyle.SINGLE } },
+            }),
+          ],
+        }),
+      },
+      footers: {
+        default: new Footer({
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({ text: company.name, size: 14, color: DARK, font: 'Calibri' }),
+                new TextRun({ text: `    ${company.website}    ${company.phone}`, size: 14, color: BRAND, font: 'Calibri' }),
+              ],
+              alignment: AlignmentType.CENTER,
+              border: { top: { color: BORDER_COLOR, size: 4, style: BorderStyle.SINGLE } },
+            }),
+          ],
+        }),
+      },
+      children: allSections,
+    }],
+  })
+
+  const blob = await Packer.toBlob(doc)
+  const filename = `${data.projectName.replace(/\s+/g, '_')}_Concept.docx`
   saveAs(blob, filename)
 }

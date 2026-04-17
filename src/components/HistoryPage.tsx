@@ -1,19 +1,27 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ProposalPreview } from '@/components/ProposalPreview'
 import type { SavedProposal, ProposalData, ProjectInfo, CompanyConfig } from '@/types/proposal'
+import type { ConceptData } from '@/types/concept'
+import type { EstimateData } from '@/types/estimate'
 import { resolveCompanyConfig } from '@/lib/companies'
-import { listProposals, updateProposalInDb, deleteProposalFromDb } from '@/lib/proposalApi'
+import { listProposals, updateProposalInDb, updateConceptInDb, updateEstimateInDb, deleteProposalFromDb } from '@/lib/proposalApi'
 import { exportToDocx } from '@/lib/docxExporter'
 import { generateProposalHTML } from '@/lib/htmlExporter'
 import {
-  ChevronLeft, ChevronRight, Clock, DollarSign, Eye,
+  ChevronLeft, ChevronRight, Eye,
   Trash2, Pencil, Eye as EyeIcon, Download, ExternalLink,
   History, Loader2, AlertCircle, CheckCircle2, ArrowLeft, Copy,
+  TableProperties, Lightbulb, FileText,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+
+const ConceptPreview = lazy(async () => {
+  const mod = await import('@/components/ConceptPreview')
+  return { default: mod.ConceptPreview }
+})
 
 interface HistoryPageProps {
   onBack: () => void
@@ -65,8 +73,23 @@ function ProposalCard({
 
       {/* Main content */}
       <div className="flex-1 min-w-0 grid grid-cols-1 gap-0.5">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <h3 className="font-semibold text-gray-900 text-sm truncate">{saved.title}</h3>
+          {saved.documentType === 'estimate' && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 text-xs font-medium shrink-0">
+              <TableProperties className="h-2.5 w-2.5" />Estimate
+            </span>
+          )}
+          {saved.documentType === 'concept' && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 text-xs font-medium shrink-0">
+              <Lightbulb className="h-2.5 w-2.5" />Concept
+            </span>
+          )}
+          {(!saved.documentType || saved.documentType === 'proposal') && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200 px-1.5 py-0.5 text-xs font-medium shrink-0">
+              <FileText className="h-2.5 w-2.5" />Proposal
+            </span>
+          )}
           <span className="text-xs text-gray-300 shrink-0">·</span>
           <span className="text-xs text-gray-400 shrink-0">{company.name}</span>
           <span className="text-xs text-gray-300 shrink-0">·</span>
@@ -146,11 +169,14 @@ function DetailView({
   onOpenInGoogleDocs: (proposal: ProposalData, info: ProjectInfo, company: CompanyConfig) => void
   isCreatingDoc: boolean
 }) {
-  const [proposal, setProposal] = useState<ProposalData>(saved.proposalData)
+  const docType = saved.documentType ?? 'proposal'
+  const [proposal, setProposal] = useState<ProposalData | undefined>(saved.proposalData)
+  const [concept, setConcept] = useState<ConceptData | undefined>(saved.conceptData)
+  const [estimate, setEstimate] = useState<EstimateData | undefined>(saved.estimateData)
   const [info] = useState<ProjectInfo>(saved.projectInfo)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [saved2, setSaved2] = useState(false)
+  const [savedOk, setSavedOk] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const company = resolveCompanyConfig(saved.companyId, saved.projectInfo.companySnapshot)
@@ -173,19 +199,45 @@ function DetailView({
 
   async function handleSave() {
     setIsSaving(true)
-    const updated = await updateProposalInDb(saved.id, proposal, info)
+    let updated: SavedProposal | null = null
+    if (docType === 'proposal' && proposal) {
+      updated = await updateProposalInDb(saved.id, proposal, info)
+    } else if (docType === 'concept' && concept) {
+      updated = await updateConceptInDb(saved.id, concept)
+    } else if (docType === 'estimate' && estimate) {
+      updated = await updateEstimateInDb(saved.id, estimate)
+    }
     setIsSaving(false)
     if (updated) {
-      setSaved2(true)
+      setSavedOk(true)
       onSaved(updated)
-      setTimeout(() => setSaved2(false), 2500)
+      setTimeout(() => setSavedOk(false), 2500)
     }
   }
 
   async function handleExport() {
     setIsExporting(true)
-    try { await exportToDocx(proposal, info, company) } finally { setIsExporting(false) }
+    try {
+      if (docType === 'proposal' && proposal) {
+        await exportToDocx(proposal, info, company)
+      } else if (docType === 'concept' && concept) {
+        const { exportConceptToDocx } = await import('@/lib/docxExporter')
+        await exportConceptToDocx(concept, info, company)
+      } else if (docType === 'estimate' && estimate) {
+        const { exportEstimateToXls } = await import('@/lib/xlsExporter')
+        await exportEstimateToXls(estimate)
+      }
+    } finally { setIsExporting(false) }
   }
+
+  const exportLabel = docType === 'estimate' ? 'Download Excel (.xlsx)' : 'Download DOCX'
+  const title = docType === 'proposal' && proposal
+    ? proposal.project.name
+    : docType === 'concept' && concept
+    ? concept.projectName
+    : docType === 'estimate' && estimate
+    ? estimate.projectName
+    : saved.title
 
   return (
     <div style={brandVars} className="min-h-screen bg-gray-50">
@@ -198,7 +250,7 @@ function DetailView({
             </Button>
             <div className="h-5 w-px bg-gray-200" />
             <div>
-              <p className="font-semibold text-sm">{proposal.project.name}</p>
+              <p className="font-semibold text-sm">{title}</p>
               <p className="text-xs text-gray-500">
                 {new Date(saved.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                 {saved.updatedAt !== saved.createdAt && ' · edited'}
@@ -225,15 +277,15 @@ function DetailView({
               <Button size="sm" onClick={handleSave} disabled={isSaving} variant="outline" className="border-green-400 text-green-700 hover:bg-green-50">
                 {isSaving
                   ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Saving…</>
-                  : saved2
+                  : savedOk
                   ? <><CheckCircle2 className="h-4 w-4 mr-1.5" />Saved</>
                   : 'Save Changes'
                 }
               </Button>
             )}
 
-            {/* Google Docs */}
-            {googleAuthStatus === 'connected' && (
+            {/* Google Docs — only for proposals */}
+            {docType === 'proposal' && googleAuthStatus === 'connected' && proposal && (
               <Button
                 variant="outline"
                 size="sm"
@@ -256,28 +308,176 @@ function DetailView({
               }
             </Button>
 
-            {/* Download DOCX */}
+            {/* Download */}
             <Button onClick={handleExport} disabled={isExporting} size="sm">
               {isExporting
                 ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />Exporting…</>
-                : <><Download className="h-4 w-4 mr-2" />Download DOCX</>
+                : <><Download className="h-4 w-4 mr-2" />{exportLabel}</>
               }
             </Button>
           </div>
         </div>
       </div>
 
+      {/* Content */}
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10">
-          <ProposalPreview
-            data={proposal}
-            info={info}
-            company={company}
+        {docType === 'proposal' && proposal && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10">
+            <ProposalPreview
+              data={proposal}
+              info={info}
+              company={company}
+              isEditing={isEditing}
+              onUpdate={setProposal}
+            />
+          </div>
+        )}
+
+        {docType === 'concept' && concept && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10">
+            <Suspense fallback={<div className="py-10 text-center text-sm text-gray-400">Loading concept…</div>}>
+              <ConceptPreview
+                data={concept}
+                info={info}
+                company={company}
+                isEditing={isEditing}
+                onUpdate={setConcept}
+              />
+            </Suspense>
+          </div>
+        )}
+
+        {docType === 'estimate' && estimate && (
+          <EstimateDetailView
+            estimate={estimate}
             isEditing={isEditing}
-            onUpdate={setProposal}
+            onUpdate={setEstimate}
+            company={company}
           />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Estimate inline detail ───────────────────────────────────────────────────
+
+function EstimateDetailView({
+  estimate,
+  isEditing,
+  onUpdate,
+  company,
+}: {
+  estimate: EstimateData
+  isEditing: boolean
+  onUpdate: (e: EstimateData) => void
+  company: CompanyConfig
+}) {
+  function updateHours(featureIdx: number, field: 'designHours' | 'frontendHours' | 'backendHours' | 'qaHours' | 'pmHours', value: number) {
+    const newFeatures = estimate.features.map((f, i) => {
+      if (i !== featureIdx) return f
+      const updated = { ...f, [field]: value }
+      updated.totalHours = (updated.designHours || 0) + (updated.frontendHours || 0) + (updated.backendHours || 0) + (updated.qaHours || 0) + (updated.pmHours || 0)
+      return updated
+    })
+    onUpdate({ ...estimate, features: newFeatures })
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {estimate.costingSummary.byPlatform.map((p, i) => (
+          <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+            <p className="text-xs text-gray-500 mb-1 font-medium">{p.platform}</p>
+            <p className="text-xl font-bold" style={{ color: company.brandColor }}>${p.totalCost.toLocaleString()}</p>
+            <p className="text-xs text-gray-400">{p.totalHours}h</p>
+          </div>
+        ))}
+        <div className="rounded-xl p-4 text-center text-white" style={{ backgroundColor: company.brandColor }}>
+          <p className="text-xs opacity-80 mb-1 font-medium">Grand Total</p>
+          <p className="text-xl font-bold">${estimate.costingSummary.grandTotalCost.toLocaleString()}</p>
+          <p className="text-xs opacity-70">{estimate.costingSummary.grandTotalHours}h · {estimate.costingSummary.timeline}</p>
         </div>
       </div>
+
+      {/* Platform tables */}
+      {estimate.platforms.map(platform => {
+        const features = estimate.features.filter(f => f.platform === platform)
+        if (features.length === 0) return null
+        const platformSummary = estimate.costingSummary.byPlatform.find(p => p.platform === platform)
+        return (
+          <div key={platform} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-3 flex items-center justify-between" style={{ backgroundColor: company.brandColor }}>
+              <h3 className="font-bold text-white">{platform}</h3>
+              {platformSummary && (
+                <span className="text-sm text-white/80">{platformSummary.totalHours}h · ${platformSummary.totalCost.toLocaleString()}</span>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-4 py-2.5 text-left font-semibold text-gray-600">Module</th>
+                    <th className="px-4 py-2.5 text-left font-semibold text-gray-600">Feature</th>
+                    <th className="px-3 py-2.5 text-center font-semibold text-gray-600">Design</th>
+                    <th className="px-3 py-2.5 text-center font-semibold text-gray-600">Frontend</th>
+                    <th className="px-3 py-2.5 text-center font-semibold text-gray-600">Backend</th>
+                    <th className="px-3 py-2.5 text-center font-semibold text-gray-600">QA</th>
+                    <th className="px-3 py-2.5 text-center font-semibold text-gray-600">PM</th>
+                    <th className="px-3 py-2.5 text-center font-semibold text-gray-600 bg-gray-100">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {features.map((feat, i) => {
+                    const globalIdx = estimate.features.indexOf(feat)
+                    return (
+                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-4 py-2 font-medium text-gray-700">{feat.module}</td>
+                        <td className="px-4 py-2 text-gray-800">
+                          {feat.feature}
+                          {feat.isSharedBackend && (
+                            <span className="ml-1.5 inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700 border border-blue-200">shared</span>
+                          )}
+                        </td>
+                        {(['designHours', 'frontendHours', 'backendHours', 'qaHours', 'pmHours'] as const).map(field => (
+                          <td key={field} className="px-3 py-2 text-center">
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                min={0}
+                                value={feat[field] || 0}
+                                onChange={e => updateHours(globalIdx, field, Number(e.target.value))}
+                                className="w-12 text-center text-xs rounded border border-gray-300 px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                              />
+                            ) : (
+                              <span className="text-gray-600">{feat[field] || '—'}</span>
+                            )}
+                          </td>
+                        ))}
+                        <td className="px-3 py-2 text-center font-semibold bg-gray-100" style={{ color: company.brandColor }}>{feat.totalHours}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-100 border-t-2 border-gray-300">
+                    <td colSpan={2} className="px-4 py-2 font-bold text-gray-700 text-right">Subtotal</td>
+                    {(['designHours', 'frontendHours', 'backendHours', 'qaHours', 'pmHours'] as const).map(key => (
+                      <td key={key} className="px-3 py-2 text-center font-semibold text-gray-700">
+                        {features.reduce((a, f) => a + (f[key] || 0), 0) || '—'}
+                      </td>
+                    ))}
+                    <td className="px-3 py-2 text-center font-bold bg-gray-100" style={{ color: company.brandColor }}>
+                      {features.reduce((a, f) => a + f.totalHours, 0)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

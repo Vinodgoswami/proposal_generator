@@ -7,12 +7,19 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import type { ProposalData, AIConfig, ProjectInfo, TeamRates, CompanyConfig, SavedProposal } from '@/types/proposal'
+import type { EstimateData } from '@/types/estimate'
+import type { ConceptData } from '@/types/concept'
 import { COMPANIES, DEFAULT_COMPANY, createCompanyConfig, resolveCompanyConfig } from '@/lib/companies'
-import { hashRequirements, checkProposalByHash, getProposalById, saveProposalToDb } from '@/lib/proposalApi'
+import {
+  hashRequirements, checkProposalByHash, getProposalById,
+  saveProposalToDb, saveEstimateToDb, saveConceptToDb,
+  updateEstimateInDb, updateConceptInDb,
+} from '@/lib/proposalApi'
 import {
   FileText, Type, Sparkles, Download, ChevronLeft,
   Key, AlertCircle, CheckCircle2, ExternalLink, Link2, Link2Off,
   Bot, Users, Pencil, Eye, Building2, History, RefreshCw, Copy, Globe,
+  TableProperties, Lightbulb, X, Loader2,
 } from 'lucide-react'
 
 const AIConfigPanel = lazy(async () => {
@@ -28,6 +35,11 @@ const ProposalPreview = lazy(async () => {
 const HistoryPage = lazy(async () => {
   const mod = await import('@/components/HistoryPage')
   return { default: mod.HistoryPage }
+})
+
+const ConceptPreview = lazy(async () => {
+  const mod = await import('@/components/ConceptPreview')
+  return { default: mod.ConceptPreview }
 })
 
 // ─── Defaults ─────────────────────────────────────────────────────────────────
@@ -63,7 +75,14 @@ function defaultProjectInfo(company: CompanyConfig): ProjectInfo {
   }
 }
 
+type DocumentType = 'proposal' | 'estimate' | 'concept'
 type AppStep = 'input' | 'generating' | 'preview' | 'history' | 'share'
+
+const DOCUMENT_TYPE_OPTIONS: { value: DocumentType; label: string; description: string }[] = [
+  { value: 'proposal', label: 'Proposal', description: 'Full technical proposal with costs, timeline, and architecture' },
+  { value: 'estimate', label: 'Estimate', description: 'Split cost estimate by platform exported as Excel (.xlsx)' },
+  { value: 'concept', label: 'Concept', description: 'Deep project concept with platform analysis, journeys, and ballpark cost' },
+]
 
 function getShareIdFromLocation(location: Location): string | null {
   const pathMatch = location.pathname.match(/^\/share\/([^/]+)$/)
@@ -91,13 +110,14 @@ export default function App() {
   const [selectedCompanyId, setSelectedCompanyId] = useState(DEFAULT_COMPANY.id)
   const [customCompany, setCustomCompany] = useState<CompanyConfig>(() => createCompanyConfig({
     id: 'custom',
-    name: 'Custom Company',
-    tagline: 'Tailored proposal delivery',
-    website: 'www.example.com',
-    phone: '+00 00000 00000',
-    email: 'hello@example.com',
+    name: '',
+    tagline: '',
+    website: '',
+    phone: '',
+    email: '',
     brandColor: DEFAULT_COMPANY.brandColor,
   }))
+  const [documentType, setDocumentType] = useState<DocumentType>('proposal')
   const [step, setStep] = useState<AppStep>(initialShareId ? 'share' : 'input')
   const [uploadedRequirements, setUploadedRequirements] = useState('')
   const [uploadedRequirementsWordCount, setUploadedRequirementsWordCount] = useState(0)
@@ -112,7 +132,11 @@ export default function App() {
   const [showAIConfig, setShowAIConfig] = useState(false)
   const [showRates, setShowRates] = useState(false)
   const [proposal, setProposal] = useState<ProposalData | null>(null)
+  const [estimate, setEstimate] = useState<EstimateData | null>(null)
+  const [concept, setConcept] = useState<ConceptData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [copiedError, setCopiedError] = useState(false)
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [progress, setProgress] = useState(0)
   const [progressMsg, setProgressMsg] = useState('')
   const [aiProvider, setAiProvider] = useState('')
@@ -120,7 +144,15 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false)
   const [generateNew, setGenerateNew] = useState(true)
   const [savedProposalId, setSavedProposalId] = useState<string | null>(null)
+  const [savedEstimateId, setSavedEstimateId] = useState<string | null>(null)
+  const [savedConceptId, setSavedConceptId] = useState<string | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [isEditingEstimate, setIsEditingEstimate] = useState(false)
+  const [isEditingConcept, setIsEditingConcept] = useState(false)
+  const [isSavingEstimate, setIsSavingEstimate] = useState(false)
+  const [isSavingConcept, setIsSavingConcept] = useState(false)
+  const [estimateSaved, setEstimateSaved] = useState(false)
+  const [conceptSaved, setConceptSaved] = useState(false)
   const [shareData, setShareData] = useState<{ saved: SavedProposal; company: CompanyConfig } | null>(null)
   const [shareLookupComplete, setShareLookupComplete] = useState(initialShareId === null)
   const [googleClientId, setGoogleClientId] = useState('')
@@ -148,14 +180,9 @@ export default function App() {
 
   function buildRequirements() {
     const sections = [
-      uploadedRequirements.trim()
-        ? `Uploaded Files\n${uploadedRequirements.trim()}`
-        : '',
-      typedRequirements.trim()
-        ? `Additional Notes\n${typedRequirements.trim()}`
-        : '',
+      uploadedRequirements.trim() ? `Uploaded Files\n${uploadedRequirements.trim()}` : '',
+      typedRequirements.trim() ? `Additional Notes\n${typedRequirements.trim()}` : '',
     ].filter(Boolean)
-
     return sections.join('\n\n')
   }
 
@@ -173,10 +200,7 @@ export default function App() {
   }
 
   function updateCustomCompany(field: keyof Pick<CompanyConfig, 'name' | 'tagline' | 'website' | 'phone' | 'email' | 'brandColor'>, value: string) {
-    const nextCompany = createCompanyConfig({
-      ...customCompany,
-      [field]: value,
-    })
+    const nextCompany = createCompanyConfig({ ...customCompany, [field]: value })
     setCustomCompany(nextCompany)
     if (selectedCompanyId === 'custom') {
       setProjectInfo(prev => ({ ...prev, preparedBy: nextCompany.name, companySnapshot: nextCompany }))
@@ -206,31 +230,44 @@ export default function App() {
     '--brand-700': company.brand700,
   } as React.CSSProperties
 
-  // ── Generate ───────────────────────────────────────────────────────────────
-
-  async function handleGenerate() {
+  // ── Validate common inputs ─────────────────────────────────────────────────
+  function validateInputs(): boolean {
     if (!requirements.trim()) {
       setError('Please add project requirements using file upload, pasted text, or both.')
-      return
+      return false
     }
-    if (!projectInfo.projectName.trim()) { setError('Please enter a project name.'); return }
+    if (!projectInfo.projectName.trim()) {
+      setError('Please enter a project name.')
+      return false
+    }
     if (!anthropicKey.trim() && !geminiKey.trim() && !openaiKey.trim()) {
       setError('Please provide at least one API key (Anthropic, Gemini, or OpenAI).')
       setShowKeys(true)
-      return
+      return false
     }
+    return true
+  }
 
+  function startProgressLoop(steps: [number, string][]): ReturnType<typeof setInterval> {
+    let i = 0
+    return setInterval(() => {
+      if (i < steps.length) { setProgress(steps[i][0]); setProgressMsg(steps[i][1]); i++ }
+    }, 1800)
+  }
+
+  // ── Generate Proposal ──────────────────────────────────────────────────────
+
+  async function handleGenerateProposal() {
     setError(null)
     setStep('generating')
 
-    // If "generate new" is off, check DB first
     if (!generateNew) {
       setProgress(5); setProgressMsg('Checking saved proposals…')
       const hash = await hashRequirements(requirements, projectInfo.projectName, `${company.id}::${company.name}::${styleReferenceText}`)
       const { found, proposal: cached } = await checkProposalByHash(hash)
       if (found && cached) {
         setProgress(100); setProgressMsg('Found in history!')
-        setProposal(cached.proposalData)
+        setProposal(cached.proposalData ?? null)
         setAiProvider('cached')
         setSavedProposalId(cached.id)
         setIsEditing(false)
@@ -239,19 +276,14 @@ export default function App() {
       }
     }
 
-    const steps: [number, string][] = [
+    const interval = startProgressLoop([
       [10, 'Analyzing project requirements…'],
       [25, 'Identifying scope and features…'],
       [45, 'Estimating hours with AI efficiency…'],
       [65, 'Calculating team and costs…'],
       [80, 'Generating proposal document…'],
       [90, `Applying ${company.name} format…`],
-    ]
-
-    let i = 0
-    const interval = setInterval(() => {
-      if (i < steps.length) { setProgress(steps[i][0]); setProgressMsg(steps[i][1]); i++ }
-    }, 1800)
+    ])
 
     try {
       const res = await fetch('/api/generate', {
@@ -284,13 +316,11 @@ export default function App() {
         companyId: company.id,
         requirementsHash: hash,
       })
-
       if (saved) {
         setSavedProposalId(saved.id)
       } else {
-        setError('Proposal generated, but it could not be saved to history yet. Share link will appear after history saving works.')
+        setError('Proposal generated, but it could not be saved to history yet.')
       }
-
       setTimeout(() => setStep('preview'), 600)
     } catch (e) {
       clearInterval(interval)
@@ -299,14 +329,189 @@ export default function App() {
     }
   }
 
+  // ── Generate Estimate ──────────────────────────────────────────────────────
+
+  async function handleGenerateEstimate() {
+    setError(null)
+    setStep('generating')
+
+    const interval = startProgressLoop([
+      [10, 'Analyzing project platforms…'],
+      [25, 'Identifying features per platform…'],
+      [45, 'Calculating role-based hours…'],
+      [65, 'Resolving shared backend modules…'],
+      [80, 'Building cost breakdown…'],
+      [90, 'Preparing Excel structure…'],
+    ])
+
+    try {
+      const res = await fetch('/api/generate-estimate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requirements,
+          projectInfo: { ...projectInfo, companySnapshot: company },
+          teamRates,
+          companyProfile: company,
+          anthropicKey,
+          geminiKey,
+          openaiKey,
+        }),
+      })
+      clearInterval(interval)
+      if (!res.ok) { const err = await res.json() as { error: string }; throw new Error(err.error) }
+      const data = await res.json() as { estimate: EstimateData; provider: string }
+      setProgress(100); setProgressMsg('Estimate ready!')
+      setEstimate(data.estimate)
+      setAiProvider(data.provider)
+      setIsEditingEstimate(false)
+
+      const hash = await hashRequirements(requirements, projectInfo.projectName)
+      const saved = await saveEstimateToDb({
+        estimateData: data.estimate,
+        projectInfo: { ...projectInfo, companySnapshot: company },
+        companyId: company.id,
+        teamRates,
+        requirementsHash: hash,
+      })
+      if (saved) setSavedEstimateId(saved.id)
+
+      setTimeout(() => setStep('preview'), 600)
+    } catch (e) {
+      clearInterval(interval)
+      setError(e instanceof Error ? e.message : 'Estimate generation failed')
+      setStep('input')
+    }
+  }
+
+  // ── Generate Concept ───────────────────────────────────────────────────────
+
+  async function handleGenerateConcept() {
+    setError(null)
+    setStep('generating')
+
+    const interval = startProgressLoop([
+      [10, 'Analyzing project idea…'],
+      [25, 'Mapping platforms and users…'],
+      [45, 'Designing user journeys…'],
+      [65, 'Outlining architecture…'],
+      [80, 'Estimating ballpark scope…'],
+      [90, 'Finalizing concept document…'],
+    ])
+
+    try {
+      const res = await fetch('/api/generate-concept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requirements,
+          projectInfo: { ...projectInfo, companySnapshot: company },
+          companyProfile: company,
+          anthropicKey,
+          geminiKey,
+          openaiKey,
+        }),
+      })
+      clearInterval(interval)
+      if (!res.ok) { const err = await res.json() as { error: string }; throw new Error(err.error) }
+      const data = await res.json() as { concept: ConceptData; provider: string }
+      setProgress(100); setProgressMsg('Concept ready!')
+      setConcept(data.concept)
+      setAiProvider(data.provider)
+      setIsEditingConcept(false)
+
+      const hash = await hashRequirements(requirements, projectInfo.projectName)
+      const saved = await saveConceptToDb({
+        conceptData: data.concept,
+        projectInfo: { ...projectInfo, companySnapshot: company },
+        companyId: company.id,
+        requirementsHash: hash,
+      })
+      if (saved) setSavedConceptId(saved.id)
+
+      setTimeout(() => setStep('preview'), 600)
+    } catch (e) {
+      clearInterval(interval)
+      setError(e instanceof Error ? e.message : 'Concept generation failed')
+      setStep('input')
+    }
+  }
+
+  async function handleGenerate() {
+    if (!validateInputs()) return
+    setEstimate(null); setConcept(null); setProposal(null)
+    setSavedEstimateId(null); setSavedConceptId(null); setSavedProposalId(null)
+    if (documentType === 'proposal') await handleGenerateProposal()
+    else if (documentType === 'estimate') await handleGenerateEstimate()
+    else await handleGenerateConcept()
+  }
+
   // ── Export ─────────────────────────────────────────────────────────────────
 
-  async function handleExport() {
+  async function handleExportProposal() {
     if (!proposal) return
     setIsExporting(true)
     try {
       const { exportToDocx } = await import('@/lib/docxExporter')
       await exportToDocx(proposal, projectInfo, company)
+    } finally { setIsExporting(false) }
+  }
+
+  async function handleExportEstimate() {
+    if (!estimate) return
+    setIsExporting(true)
+    try {
+      const { exportEstimateToXls } = await import('@/lib/xlsExporter')
+      await exportEstimateToXls(estimate)
+    } finally { setIsExporting(false) }
+  }
+
+  async function handleSaveEstimateChanges() {
+    if (!estimate || !savedEstimateId) return
+    setIsSavingEstimate(true)
+    const updated = await updateEstimateInDb(savedEstimateId, estimate)
+    setIsSavingEstimate(false)
+    if (updated) {
+      setEstimateSaved(true)
+      setTimeout(() => setEstimateSaved(false), 2500)
+    }
+  }
+
+  async function handleSaveConceptChanges() {
+    if (!concept || !savedConceptId) return
+    setIsSavingConcept(true)
+    const updated = await updateConceptInDb(savedConceptId, concept)
+    setIsSavingConcept(false)
+    if (updated) {
+      setConceptSaved(true)
+      setTimeout(() => setConceptSaved(false), 2500)
+    }
+  }
+
+  function handleCopyEstimateLink() {
+    if (!savedEstimateId) return
+    const url = buildShareUrl(savedEstimateId)
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2500)
+    })
+  }
+
+  function handleCopyConceptLink() {
+    if (!savedConceptId) return
+    const url = buildShareUrl(savedConceptId)
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2500)
+    })
+  }
+
+  async function handleExportConcept() {
+    if (!concept) return
+    setIsExporting(true)
+    try {
+      const { exportConceptToDocx } = await import('@/lib/docxExporter')
+      await exportConceptToDocx(concept, projectInfo, company)
     } finally { setIsExporting(false) }
   }
 
@@ -317,10 +522,7 @@ export default function App() {
     if (!shareId) return
     getProposalById(shareId)
       .then((saved: SavedProposal | null) => {
-        if (!saved) {
-          setShareLookupComplete(true)
-          return
-        }
+        if (!saved) { setShareLookupComplete(true); return }
         const comp = resolveCompanyConfig(saved.companyId, saved.projectInfo.companySnapshot)
         setShareData({ saved, company: comp })
         setStep('share')
@@ -417,8 +619,41 @@ export default function App() {
     } finally { setIsCreatingDoc(false) }
   }
 
+  // ── Error auto-dismiss ─────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!error) return
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
+    errorTimerRef.current = setTimeout(() => setError(null), 5000)
+    return () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current) }
+  }, [error])
+
+  function handleCopyError() {
+    if (!error) return
+    navigator.clipboard.writeText(error).then(() => {
+      setCopiedError(true)
+      setTimeout(() => setCopiedError(false), 2000)
+    })
+  }
+
+  // ── Generate button label ──────────────────────────────────────────────────
+  const generateLabel =
+    documentType === 'estimate' ? 'Generate Estimate'
+    : documentType === 'concept' ? 'Generate Concept'
+    : 'Generate Proposal'
+
+  const generateIcon =
+    documentType === 'estimate' ? <TableProperties className="h-5 w-5" />
+    : documentType === 'concept' ? <Lightbulb className="h-5 w-5" />
+    : <Sparkles className="h-5 w-5" />
+
+  const generatingLabel =
+    documentType === 'estimate' ? 'Generating Estimate'
+    : documentType === 'concept' ? 'Generating Concept'
+    : 'Generating Proposal'
+
   // ──────────────────────────────────────────────────────────────────────────
-  // Render: Share view (opened via ?share=id link)
+  // Render: Share view
   // ──────────────────────────────────────────────────────────────────────────
 
   if (initialShareId && !shareLookupComplete) {
@@ -437,9 +672,7 @@ export default function App() {
         <div className="max-w-md w-full mx-4 rounded-xl border border-red-200 bg-white p-8 text-center space-y-3">
           <AlertCircle className="h-10 w-10 text-red-500 mx-auto" />
           <h1 className="text-xl font-bold text-gray-900">Shared Proposal Not Found</h1>
-          <p className="text-sm text-gray-500">
-            This shared proposal link is invalid, expired, or no longer available.
-          </p>
+          <p className="text-sm text-gray-500">This shared proposal link is invalid, expired, or no longer available.</p>
         </div>
       </div>
     )
@@ -447,6 +680,15 @@ export default function App() {
 
   if (step === 'share' && shareData) {
     const { saved, company: shareCompany } = shareData
+    const shareDocType = saved.documentType ?? 'proposal'
+    const shareTitle = shareDocType === 'concept' && saved.conceptData
+      ? saved.conceptData.projectName
+      : shareDocType === 'estimate' && saved.estimateData
+      ? saved.estimateData.projectName
+      : saved.proposalData?.project.name ?? saved.title
+    const shareSubtitle = shareDocType === 'estimate' ? 'Shared estimate'
+      : shareDocType === 'concept' ? 'Shared concept'
+      : 'Shared proposal'
     const shareBrandVars = {
       '--brand': shareCompany.brandColor,
       '--brand-50': shareCompany.brand50,
@@ -464,24 +706,23 @@ export default function App() {
                 <FileText className="h-4 w-4 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-sm">{saved.proposalData.project.name}</p>
-                <p className="text-xs text-gray-400">{shareCompany.name} · Shared proposal</p>
+                <p className="font-semibold text-sm">{shareTitle}</p>
+                <p className="text-xs text-gray-400">{shareCompany.name} · {shareSubtitle}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {googleAuthStatus === 'connected' ? (
+              {shareDocType === 'proposal' && saved.proposalData && googleAuthStatus === 'connected' && (
                 <Button
-                  variant="outline"
-                  size="sm"
+                  variant="outline" size="sm"
                   onClick={async () => {
                     setIsCreatingDoc(true)
                     try {
                       const { generateProposalHTML } = await import('@/lib/htmlExporter')
-                      const html = generateProposalHTML(saved.proposalData, saved.projectInfo, shareCompany)
+                      const html = generateProposalHTML(saved.proposalData!, saved.projectInfo, shareCompany)
                       const res = await fetch('/api/google/create-doc', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ html, title: saved.proposalData.project.name }),
+                        body: JSON.stringify({ html, title: saved.proposalData!.project.name }),
                       })
                       if (!res.ok) throw new Error('Failed')
                       const { docUrl } = await res.json() as { docUrl: string }
@@ -493,60 +734,47 @@ export default function App() {
                 >
                   {isCreatingDoc
                     ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent mr-2" />Creating…</>
-                    : <><ExternalLink className="h-4 w-4 mr-2" />Open in Google Docs</>
-                  }
+                    : <><ExternalLink className="h-4 w-4 mr-2" />Open in Google Docs</>}
                 </Button>
-              ) : (
-                <div className="relative" ref={googlePopoverRef}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowGooglePopover(v => !v)}
-                    className="border-gray-300 text-gray-500 hover:bg-gray-50 text-xs gap-1.5"
-                  >
-                    <Globe className="h-3.5 w-3.5" />Google Docs
-                  </Button>
-                  {showGooglePopover && (
-                    <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl border border-gray-200 shadow-lg p-4 z-50 space-y-3">
-                      <p className="text-xs font-semibold text-gray-700">Connect Google Account</p>
-                      <div className="space-y-1.5">
-                        <label className="text-xs text-gray-500">OAuth Client ID</label>
-                        <Input type="text" placeholder="….apps.googleusercontent.com" value={googleClientId} onChange={e => setGoogleClientId(e.target.value)} className="text-xs h-8" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs text-gray-500">OAuth Client Secret</label>
-                        <Input type="password" placeholder="GOCSPX-…" value={googleClientSecret} onChange={e => setGoogleClientSecret(e.target.value)} className="text-xs h-8" />
-                      </div>
-                      <Button size="sm" className="w-full h-8 text-xs gap-1.5 bg-brand-orange hover:bg-brand-orange/90" onClick={() => { handleConnectGoogle(); setShowGooglePopover(false) }} disabled={!googleClientId || !googleClientSecret}>
-                        <Link2 className="h-3.5 w-3.5" />Connect
-                      </Button>
-                    </div>
-                  )}
-                </div>
               )}
               <Button
                 size="sm"
                 onClick={async () => {
                   setIsExporting(true)
                   try {
-                    const { exportToDocx } = await import('@/lib/docxExporter')
-                    await exportToDocx(saved.proposalData, saved.projectInfo, shareCompany)
+                    if (shareDocType === 'estimate' && saved.estimateData) {
+                      const { exportEstimateToXls } = await import('@/lib/xlsExporter')
+                      await exportEstimateToXls(saved.estimateData)
+                    } else if (shareDocType === 'concept' && saved.conceptData) {
+                      const { exportConceptToDocx } = await import('@/lib/docxExporter')
+                      await exportConceptToDocx(saved.conceptData, saved.projectInfo, shareCompany)
+                    } else if (saved.proposalData) {
+                      const { exportToDocx } = await import('@/lib/docxExporter')
+                      await exportToDocx(saved.proposalData, saved.projectInfo, shareCompany)
+                    }
                   } finally { setIsExporting(false) }
                 }}
                 disabled={isExporting}
               >
                 {isExporting
                   ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />Exporting…</>
-                  : <><Download className="h-4 w-4 mr-2" />Download DOCX</>
-                }
+                  : <><Download className="h-4 w-4 mr-2" />{shareDocType === 'estimate' ? 'Download Excel (.xlsx)' : 'Download DOCX'}</>}
               </Button>
             </div>
           </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 py-8">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10">
-            <Suspense fallback={<PanelLoader label="Loading shared proposal..." />}>
-              <ProposalPreview data={saved.proposalData} info={saved.projectInfo} company={shareCompany} />
+            <Suspense fallback={<PanelLoader label="Loading…" />}>
+              {shareDocType === 'proposal' && saved.proposalData && (
+                <ProposalPreview data={saved.proposalData} info={saved.projectInfo} company={shareCompany} />
+              )}
+              {shareDocType === 'concept' && saved.conceptData && (
+                <ConceptPreview data={saved.conceptData} info={saved.projectInfo} company={shareCompany} />
+              )}
+              {shareDocType === 'estimate' && saved.estimateData && (
+                <div className="text-sm text-gray-500 text-center py-8">Download the Excel file above to view the full estimate.</div>
+              )}
             </Suspense>
           </div>
         </div>
@@ -599,11 +827,16 @@ export default function App() {
           <div className="flex justify-center">
             <div className="relative">
               <div className="h-20 w-20 rounded-full border-4 border-brand-100 border-t-brand-orange animate-spin" />
-              <Sparkles className="absolute inset-0 m-auto h-8 w-8 text-brand-orange" />
+              {documentType === 'estimate'
+                ? <TableProperties className="absolute inset-0 m-auto h-8 w-8 text-brand-orange" />
+                : documentType === 'concept'
+                  ? <Lightbulb className="absolute inset-0 m-auto h-8 w-8 text-brand-orange" />
+                  : <Sparkles className="absolute inset-0 m-auto h-8 w-8 text-brand-orange" />
+              }
             </div>
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Generating Proposal</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{generatingLabel}</h2>
             <p className="text-gray-500 mt-1">{progressMsg}</p>
           </div>
           <Progress value={progress} className="h-2" />
@@ -614,13 +847,12 @@ export default function App() {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Render: Preview
+  // Render: Preview — Proposal
   // ──────────────────────────────────────────────────────────────────────────
 
-  if (step === 'preview' && proposal) {
+  if (step === 'preview' && proposal && documentType === 'proposal') {
     return (
       <div style={brandVars} className="min-h-screen bg-gray-50">
-        {/* Toolbar */}
         <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
           <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -640,43 +872,17 @@ export default function App() {
                 </div>
               </div>
             </div>
-
             <div className="flex items-center gap-2">
-              {/* Edit toggle */}
-              <Button
-                variant={isEditing ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setIsEditing(!isEditing)}
-                className={isEditing ? 'bg-brand-orange hover:bg-brand-orange/90' : ''}
-              >
-                {isEditing
-                  ? <><Eye className="h-4 w-4 mr-1.5" />Done Editing</>
-                  : <><Pencil className="h-4 w-4 mr-1.5" />Edit</>
-                }
+              <Button variant={isEditing ? 'default' : 'outline'} size="sm" onClick={() => setIsEditing(!isEditing)} className={isEditing ? 'bg-brand-orange hover:bg-brand-orange/90' : ''}>
+                {isEditing ? <><Eye className="h-4 w-4 mr-1.5" />Done Editing</> : <><Pencil className="h-4 w-4 mr-1.5" />Edit</>}
               </Button>
-
-              {/* Google Docs */}
               {googleAuthStatus === 'connected' ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleOpenInGoogleDocs}
-                  disabled={isCreatingDoc}
-                  className="border-green-300 text-green-700 hover:bg-green-50"
-                >
-                  {isCreatingDoc
-                    ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent mr-2" />Creating…</>
-                    : <><ExternalLink className="h-4 w-4 mr-2" />Open in Google Docs</>
-                  }
+                <Button variant="outline" size="sm" onClick={handleOpenInGoogleDocs} disabled={isCreatingDoc} className="border-green-300 text-green-700 hover:bg-green-50">
+                  {isCreatingDoc ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent mr-2" />Creating…</> : <><ExternalLink className="h-4 w-4 mr-2" />Open in Google Docs</>}
                 </Button>
               ) : (
                 <div className="relative" ref={googlePopoverRef}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowGooglePopover(v => !v)}
-                    className="border-gray-300 text-gray-500 hover:bg-gray-50 text-xs gap-1.5"
-                  >
+                  <Button variant="outline" size="sm" onClick={() => setShowGooglePopover(v => !v)} className="border-gray-300 text-gray-500 hover:bg-gray-50 text-xs gap-1.5">
                     <Globe className="h-3.5 w-3.5" />
                     {googleAuthStatus === 'connecting' ? 'Connecting…' : 'Google Docs'}
                   </Button>
@@ -685,30 +891,13 @@ export default function App() {
                       <p className="text-xs font-semibold text-gray-700">Connect Google Account</p>
                       <div className="space-y-1.5">
                         <label className="text-xs text-gray-500">OAuth Client ID</label>
-                        <Input
-                          type="text"
-                          placeholder="….apps.googleusercontent.com"
-                          value={googleClientId}
-                          onChange={e => setGoogleClientId(e.target.value)}
-                          className="text-xs h-8"
-                        />
+                        <Input type="text" placeholder="….apps.googleusercontent.com" value={googleClientId} onChange={e => setGoogleClientId(e.target.value)} className="text-xs h-8" />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-xs text-gray-500">OAuth Client Secret</label>
-                        <Input
-                          type="password"
-                          placeholder="GOCSPX-…"
-                          value={googleClientSecret}
-                          onChange={e => setGoogleClientSecret(e.target.value)}
-                          className="text-xs h-8"
-                        />
+                        <Input type="password" placeholder="GOCSPX-…" value={googleClientSecret} onChange={e => setGoogleClientSecret(e.target.value)} className="text-xs h-8" />
                       </div>
-                      <Button
-                        size="sm"
-                        className="w-full h-8 text-xs gap-1.5 bg-brand-orange hover:bg-brand-orange/90"
-                        onClick={() => { handleConnectGoogle(); setShowGooglePopover(false) }}
-                        disabled={!googleClientId || !googleClientSecret || googleAuthStatus === 'connecting'}
-                      >
+                      <Button size="sm" className="w-full h-8 text-xs gap-1.5 bg-brand-orange hover:bg-brand-orange/90" onClick={() => { handleConnectGoogle(); setShowGooglePopover(false) }} disabled={!googleClientId || !googleClientSecret || googleAuthStatus === 'connecting'}>
                         <Link2 className="h-3.5 w-3.5" />Connect Google Account
                       </Button>
                       <p className="text-xs text-gray-400">Add your app callback URL as <code className="bg-gray-100 px-1 rounded">{`${window.location.origin}/api/google/callback`}</code>.</p>
@@ -716,44 +905,233 @@ export default function App() {
                   )}
                 </div>
               )}
-
-              {/* Share link */}
               {savedProposalId && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyLink}
-                  className="gap-1.5 text-gray-600"
-                >
-                  {linkCopied
-                    ? <><CheckCircle2 className="h-3.5 w-3.5 text-green-600" />Copied!</>
-                    : <><Copy className="h-3.5 w-3.5" />Copy Link</>
-                  }
+                <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-1.5 text-gray-600">
+                  {linkCopied ? <><CheckCircle2 className="h-3.5 w-3.5 text-green-600" />Copied!</> : <><Copy className="h-3.5 w-3.5" />Copy Link</>}
                 </Button>
               )}
-
-              {/* Download */}
-              <Button onClick={handleExport} disabled={isExporting} size="sm">
-                {isExporting
-                  ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />Exporting…</>
-                  : <><Download className="h-4 w-4 mr-2" />Download DOCX</>
-                }
+              <Button onClick={handleExportProposal} disabled={isExporting} size="sm">
+                {isExporting ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />Exporting…</> : <><Download className="h-4 w-4 mr-2" />Download DOCX</>}
               </Button>
             </div>
           </div>
         </div>
-
-        {/* Proposal */}
         <div className="max-w-5xl mx-auto px-4 py-8">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10">
             <Suspense fallback={<PanelLoader label="Loading proposal preview..." />}>
-              <ProposalPreview
-                data={proposal}
-                info={projectInfo}
-                company={company}
-                isEditing={isEditing}
-                onUpdate={setProposal}
-              />
+              <ProposalPreview data={proposal} info={projectInfo} company={company} isEditing={isEditing} onUpdate={setProposal} />
+            </Suspense>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Render: Preview — Estimate
+  // ──────────────────────────────────────────────────────────────────────────
+
+  if (step === 'preview' && estimate && documentType === 'estimate') {
+    return (
+      <div style={brandVars} className="min-h-screen bg-gray-50">
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" onClick={() => setStep('input')}>
+                <ChevronLeft className="h-4 w-4 mr-1" /> Back
+              </Button>
+              <div className="h-5 w-px bg-gray-200" />
+              <div>
+                <p className="font-semibold text-sm">{estimate.projectName} — Cost Estimate</p>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {aiProvider === 'anthropic' ? '✦ Claude' : aiProvider === 'gemini' ? '✦ Gemini' : '✦ GPT-4o'}
+                  </Badge>
+                  <span className="text-xs text-gray-500">
+                    {estimate.costingSummary.grandTotalHours}h · ${estimate.costingSummary.grandTotalCost.toLocaleString()} · {estimate.costingSummary.timeline}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant={isEditingEstimate ? 'default' : 'outline'} size="sm" onClick={() => setIsEditingEstimate(!isEditingEstimate)} className={isEditingEstimate ? 'bg-brand-orange hover:bg-brand-orange/90' : ''}>
+                {isEditingEstimate ? <><Eye className="h-4 w-4 mr-1.5" />Done Editing</> : <><Pencil className="h-4 w-4 mr-1.5" />Edit</>}
+              </Button>
+              {isEditingEstimate && (
+                <Button size="sm" onClick={handleSaveEstimateChanges} disabled={isSavingEstimate} variant="outline" className="border-green-400 text-green-700 hover:bg-green-50">
+                  {isSavingEstimate ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Saving…</> : estimateSaved ? <><CheckCircle2 className="h-4 w-4 mr-1.5" />Saved</> : 'Save Changes'}
+                </Button>
+              )}
+              {savedEstimateId && (
+                <Button variant="outline" size="sm" onClick={handleCopyEstimateLink} className="gap-1.5 text-gray-600">
+                  {linkCopied ? <><CheckCircle2 className="h-3.5 w-3.5 text-green-600" />Copied!</> : <><Copy className="h-3.5 w-3.5" />Copy Link</>}
+                </Button>
+              )}
+              <Button onClick={handleExportEstimate} disabled={isExporting} size="sm" className="gap-2">
+                {isExporting
+                  ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />Exporting…</>
+                  : <><Download className="h-4 w-4" />Download Excel (.xlsx)</>}
+              </Button>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+
+          {/* Summary cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {estimate.costingSummary.byPlatform.map((p, i) => (
+              <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+                <p className="text-xs text-gray-500 mb-1 font-medium">{p.platform}</p>
+                <p className="text-xl font-bold text-brand-orange">${p.totalCost.toLocaleString()}</p>
+                <p className="text-xs text-gray-400">{p.totalHours}h</p>
+              </div>
+            ))}
+            <div className="bg-brand-orange rounded-xl p-4 text-center text-white">
+              <p className="text-xs opacity-80 mb-1 font-medium">Grand Total</p>
+              <p className="text-xl font-bold">${estimate.costingSummary.grandTotalCost.toLocaleString()}</p>
+              <p className="text-xs opacity-70">{estimate.costingSummary.grandTotalHours}h · {estimate.costingSummary.timeline}</p>
+            </div>
+          </div>
+
+          {/* Platform breakdown tables */}
+          {estimate.platforms.map(platform => {
+            const features = estimate.features.filter(f => f.platform === platform)
+            if (features.length === 0) return null
+            const platformSummary = estimate.costingSummary.byPlatform.find(p => p.platform === platform)
+            return (
+              <div key={platform} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="bg-brand-orange px-5 py-3 flex items-center justify-between">
+                  <h3 className="font-bold text-white">{platform}</h3>
+                  {platformSummary && (
+                    <span className="text-sm text-white/80">{platformSummary.totalHours}h · ${platformSummary.totalCost.toLocaleString()}</span>
+                  )}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="px-4 py-2.5 text-left font-semibold text-gray-600">Module</th>
+                        <th className="px-4 py-2.5 text-left font-semibold text-gray-600">Feature</th>
+                        <th className="px-4 py-2.5 text-left font-semibold text-gray-600">Description</th>
+                        <th className="px-3 py-2.5 text-center font-semibold text-gray-600">Design</th>
+                        <th className="px-3 py-2.5 text-center font-semibold text-gray-600">Frontend</th>
+                        <th className="px-3 py-2.5 text-center font-semibold text-gray-600">Backend</th>
+                        <th className="px-3 py-2.5 text-center font-semibold text-gray-600">QA</th>
+                        <th className="px-3 py-2.5 text-center font-semibold text-gray-600">PM</th>
+                        <th className="px-3 py-2.5 text-center font-semibold text-gray-600 bg-brand-50">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {features.map((feat, i) => (
+                        <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-4 py-2 font-medium text-gray-700">{feat.module}</td>
+                          <td className="px-4 py-2 text-gray-800">
+                            {feat.feature}
+                            {feat.isSharedBackend && (
+                              <span className="ml-1.5 inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700 border border-blue-200">shared</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-gray-500 max-w-[180px]">
+                            <span className="line-clamp-2">{feat.description}</span>
+                            {feat.sharedNote && <span className="block text-blue-500 text-xs mt-0.5">{feat.sharedNote}</span>}
+                          </td>
+                          <td className="px-3 py-2 text-center text-gray-600">{feat.designHours || '—'}</td>
+                          <td className="px-3 py-2 text-center text-gray-600">{feat.frontendHours || '—'}</td>
+                          <td className="px-3 py-2 text-center text-gray-600">{feat.backendHours || '—'}</td>
+                          <td className="px-3 py-2 text-center text-gray-600">{feat.qaHours || '—'}</td>
+                          <td className="px-3 py-2 text-center text-gray-600">{feat.pmHours || '—'}</td>
+                          <td className="px-3 py-2 text-center font-semibold text-brand-orange bg-brand-50">{feat.totalHours}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-100 border-t-2 border-gray-300">
+                        <td colSpan={3} className="px-4 py-2 font-bold text-gray-700 text-right">Subtotal</td>
+                        {(['designHours', 'frontendHours', 'backendHours', 'qaHours', 'pmHours'] as const).map(key => (
+                          <td key={key} className="px-3 py-2 text-center font-semibold text-gray-700">
+                            {features.reduce((a, f) => a + (f[key] || 0), 0) || '—'}
+                          </td>
+                        ))}
+                        <td className="px-3 py-2 text-center font-bold text-brand-orange bg-brand-50">
+                          {features.reduce((a, f) => a + f.totalHours, 0)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
+
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-700">
+            <p className="font-semibold mb-1">About Shared Backend Modules</p>
+            <p>Features marked <span className="inline-flex items-center rounded-full bg-blue-100 px-1.5 border border-blue-200 font-medium">shared</span> reuse backend work developed for another platform. Only setup/integration hours are counted for the second platform to avoid double-counting development cost.</p>
+          </div>
+
+          <div className="flex justify-center">
+            <Button onClick={handleExportEstimate} disabled={isExporting} size="lg" className="gap-2 h-12 px-8">
+              {isExporting
+                ? <><div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />Preparing Excel…</>
+                : <><Download className="h-5 w-5" />Download Full Excel Estimate (.xlsx)</>}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Render: Preview — Concept
+  // ──────────────────────────────────────────────────────────────────────────
+
+  if (step === 'preview' && concept && documentType === 'concept') {
+    return (
+      <div style={brandVars} className="min-h-screen bg-gray-50">
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" onClick={() => setStep('input')}>
+                <ChevronLeft className="h-4 w-4 mr-1" /> Back
+              </Button>
+              <div className="h-5 w-px bg-gray-200" />
+              <div>
+                <p className="font-semibold text-sm">{concept.projectName} — Concept</p>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {aiProvider === 'anthropic' ? '✦ Claude' : aiProvider === 'gemini' ? '✦ Gemini' : '✦ GPT-4o'}
+                  </Badge>
+                  <span className="text-xs text-gray-500">
+                    {concept.targetPlatforms.length} platforms · {concept.keyFeatures.length} features
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant={isEditingConcept ? 'default' : 'outline'} size="sm" onClick={() => setIsEditingConcept(!isEditingConcept)} className={isEditingConcept ? 'bg-brand-orange hover:bg-brand-orange/90' : ''}>
+                {isEditingConcept ? <><Eye className="h-4 w-4 mr-1.5" />Done Editing</> : <><Pencil className="h-4 w-4 mr-1.5" />Edit</>}
+              </Button>
+              {isEditingConcept && (
+                <Button size="sm" onClick={handleSaveConceptChanges} disabled={isSavingConcept} variant="outline" className="border-green-400 text-green-700 hover:bg-green-50">
+                  {isSavingConcept ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Saving…</> : conceptSaved ? <><CheckCircle2 className="h-4 w-4 mr-1.5" />Saved</> : 'Save Changes'}
+                </Button>
+              )}
+              {savedConceptId && (
+                <Button variant="outline" size="sm" onClick={handleCopyConceptLink} className="gap-1.5 text-gray-600">
+                  {linkCopied ? <><CheckCircle2 className="h-3.5 w-3.5 text-green-600" />Copied!</> : <><Copy className="h-3.5 w-3.5" />Copy Link</>}
+                </Button>
+              )}
+              <Button onClick={handleExportConcept} disabled={isExporting} size="sm">
+                {isExporting
+                  ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />Exporting…</>
+                  : <><Download className="h-4 w-4 mr-2" />Download DOCX</>}
+              </Button>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10">
+            <Suspense fallback={<PanelLoader label="Loading concept..." />}>
+              <ConceptPreview data={concept} info={projectInfo} company={company} isEditing={isEditingConcept} onUpdate={setConcept} />
             </Suspense>
           </div>
         </div>
@@ -767,7 +1145,34 @@ export default function App() {
 
   return (
     <div style={brandVars} className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* ── Error toast ── */}
+      {error && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4 animate-in slide-in-from-top-2 duration-300">
+          <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-white shadow-lg px-4 py-3">
+            <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+            <p className="flex-1 text-sm text-red-700 leading-snug">{error}</p>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={handleCopyError}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-red-500 hover:bg-red-50 transition-colors"
+                title="Copy error"
+              >
+                {copiedError ? <CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                {copiedError ? 'Copied' : 'Copy'}
+              </button>
+              <button
+                onClick={() => setError(null)}
+                className="rounded-md p-1 text-red-400 hover:bg-red-50 transition-colors"
+                title="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header — simplified, company selector moved to Project Info */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -776,36 +1181,12 @@ export default function App() {
             </div>
             <div>
               <h1 className="font-bold text-lg leading-tight">Proposal Maker</h1>
-              <p className="text-xs text-gray-500">{company.name} · AI-Powered Technical Proposals</p>
+              <p className="text-xs text-gray-500">{company.name} · AI-Powered Technical Documents</p>
             </div>
           </div>
-
-          {/* History + Company selector */}
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => setStep('history')} className="gap-1.5 text-gray-600">
-              <History className="h-4 w-4" />History
-            </Button>
-            <div className="h-5 w-px bg-gray-200" />
-            <Building2 className="h-4 w-4 text-gray-400" />
-            <span className="text-xs text-gray-500 font-medium">Proposal on behalf of</span>
-            <div className="relative">
-              <select
-                value={company.id}
-                onChange={e => handleCompanyChange(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-sm font-semibold rounded-lg border-2 border-brand-orange bg-white text-brand-orange focus:outline-none cursor-pointer"
-              >
-                {COMPANIES.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-                <option value="custom">{customCompany.name || 'Custom Company'}</option>
-              </select>
-              <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
-                <svg className="h-3.5 w-3.5 text-brand-orange" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
+          <Button variant="outline" size="sm" onClick={() => setStep('history')} className="gap-1.5 text-gray-600">
+            <History className="h-4 w-4" />History
+          </Button>
         </div>
       </header>
 
@@ -831,6 +1212,53 @@ export default function App() {
                   <Label htmlFor="engagementType">Engagement Type</Label>
                   <Input id="engagementType" placeholder="Fixed-Price · Phased Delivery" value={projectInfo.engagementType} onChange={e => updateInfo('engagementType', e.target.value)} />
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="documentType">Document Type</Label>
+                  <div className="relative">
+                    <select
+                      id="documentType"
+                      value={documentType}
+                      onChange={e => setDocumentType(e.target.value as DocumentType)}
+                      className="w-full appearance-none pl-3 pr-8 py-2 text-sm rounded-lg border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-orange/30 cursor-pointer"
+                    >
+                      {DOCUMENT_TYPE_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
+                      <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    {DOCUMENT_TYPE_OPTIONS.find(o => o.value === documentType)?.description}
+                  </p>
+                </div>
+                {/* 5th field: Proposal on behalf of */}
+                <div className="col-span-2 space-y-1.5">
+                  <Label className="flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5 text-gray-400" />
+                    Proposal on Behalf of
+                  </Label>
+                  <div className="relative">
+                    <select
+                      value={company.id}
+                      onChange={e => handleCompanyChange(e.target.value)}
+                      className="w-full appearance-none pl-3 pr-8 py-2 text-sm font-semibold rounded-lg border-2 border-brand-orange bg-white text-brand-orange focus:outline-none cursor-pointer"
+                    >
+                      {COMPANIES.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                      <option value="custom">{customCompany.name.trim() || 'Custom Company'}</option>
+                    </select>
+                    <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
+                      <svg className="h-3.5 w-3.5 text-brand-orange" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -840,23 +1268,23 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="customCompanyName">Company Name *</Label>
-                    <Input id="customCompanyName" value={customCompany.name} onChange={e => updateCustomCompany('name', e.target.value)} />
+                    <Input id="customCompanyName" placeholder="e.g. Acme Corp" value={customCompany.name} onChange={e => updateCustomCompany('name', e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="customCompanyTagline">Tagline</Label>
-                    <Input id="customCompanyTagline" value={customCompany.tagline} onChange={e => updateCustomCompany('tagline', e.target.value)} />
+                    <Input id="customCompanyTagline" placeholder="e.g. Building the future, together" value={customCompany.tagline} onChange={e => updateCustomCompany('tagline', e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="customCompanyWebsite">Website</Label>
-                    <Input id="customCompanyWebsite" value={customCompany.website} onChange={e => updateCustomCompany('website', e.target.value)} />
+                    <Input id="customCompanyWebsite" placeholder="e.g. www.acmecorp.com" value={customCompany.website} onChange={e => updateCustomCompany('website', e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="customCompanyPhone">Phone</Label>
-                    <Input id="customCompanyPhone" value={customCompany.phone} onChange={e => updateCustomCompany('phone', e.target.value)} />
+                    <Input id="customCompanyPhone" placeholder="e.g. +1 800 000 0000" value={customCompany.phone} onChange={e => updateCustomCompany('phone', e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="customCompanyEmail">Email</Label>
-                    <Input id="customCompanyEmail" value={customCompany.email} onChange={e => updateCustomCompany('email', e.target.value)} />
+                    <Input id="customCompanyEmail" placeholder="e.g. hello@acmecorp.com" value={customCompany.email} onChange={e => updateCustomCompany('email', e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="customCompanyColor">Brand Color</Label>
@@ -886,7 +1314,7 @@ export default function App() {
                     {styleReferenceName && <span className="text-sm text-gray-500 truncate">{styleReferenceName}</span>}
                   </div>
                   <p className="text-xs text-gray-500">
-                    Upload an older proposal from this company to guide tone, brand voice, structure, and style. It will be used as reference only.
+                    Upload an older proposal from this company to guide tone, brand voice, structure, and style.
                   </p>
                   {styleReferenceText && (
                     <div className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-700">
@@ -922,7 +1350,7 @@ export default function App() {
                     isLoading={false}
                   />
                   <p className="text-xs text-gray-500">
-                    Upload one file or multiple files. All successfully parsed files are combined and used in the proposal.
+                    Upload one file or multiple files. All successfully parsed files are combined.
                   </p>
                 </div>
 
@@ -930,7 +1358,7 @@ export default function App() {
                   <Label htmlFor="requirementsText" className="text-xs font-semibold text-gray-700">Paste Additional Text</Label>
                   <Textarea
                     id="requirementsText"
-                    placeholder="Paste your project requirements, SRS, PRD, notes, or clarifications here. If you also upload files, this text will be added too."
+                    placeholder="Paste your project requirements, SRS, PRD, notes, or clarifications here."
                     value={typedRequirements}
                     onChange={e => setTypedRequirements(e.target.value)}
                     className="min-h-[220px] font-mono text-sm resize-y"
@@ -942,46 +1370,45 @@ export default function App() {
                 <div className="space-y-2 rounded-lg border border-green-200 bg-green-50 px-3 py-3 text-xs text-green-800">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    <span>{totalWordCount.toLocaleString()} words ready for proposal generation</span>
+                    <span>{totalWordCount.toLocaleString()} words ready for {documentType} generation</span>
                   </div>
                   <div className="flex flex-wrap gap-2 pl-6 text-green-700">
                     {uploadedRequirements && <span>{uploadedWordCount.toLocaleString()} words from uploaded files</span>}
                     {typedRequirements && <span>{typedWordCount.toLocaleString()} words from pasted text</span>}
-                    {uploadedRequirements && typedRequirements && <span>Both sources will be merged before generation.</span>}
                   </div>
                 </div>
               )}
 
-              {/* Generate New toggle */}
-              <div className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <RefreshCw className="h-3.5 w-3.5 text-gray-500" />
-                  <span className="text-xs font-medium text-gray-700">Generate new proposal</span>
-                  <span className="text-xs text-gray-400">
-                    {generateNew ? 'Always generate fresh' : 'Reuse from history if available'}
-                  </span>
+              {/* Generate New toggle — only relevant for Proposal (has caching) */}
+              {documentType === 'proposal' && (
+                <div className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="h-3.5 w-3.5 text-gray-500" />
+                    <span className="text-xs font-medium text-gray-700">Generate new proposal</span>
+                    <span className="text-xs text-gray-400">
+                      {generateNew ? 'Always generate fresh' : 'Reuse from history if available'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setGenerateNew(v => !v)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${generateNew ? 'bg-brand-orange' : 'bg-gray-300'}`}
+                    role="switch"
+                    aria-checked={generateNew}
+                  >
+                    <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${generateNew ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setGenerateNew(v => !v)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${generateNew ? 'bg-brand-orange' : 'bg-gray-300'}`}
-                  role="switch"
-                  aria-checked={generateNew}
-                >
-                  <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${generateNew ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
-              </div>
+              )}
             </div>
 
-            {/* Team Rates — collapsible, below requirements */}
+            {/* Team Rates */}
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
               <button onClick={() => setShowRates(!showRates)} className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-brand-orange" />
                   <span className="font-semibold text-sm">Team Rates</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">{showRates ? 'Hide' : 'Edit rates'}</span>
-                </div>
+                <span className="text-xs text-gray-400">{showRates ? 'Hide' : 'Edit rates'}</span>
               </button>
 
               {showRates ? (
@@ -991,22 +1418,13 @@ export default function App() {
                       <span className="text-sm text-gray-700 font-medium">{role}</span>
                       <div className="flex items-center gap-1">
                         <span className="text-xs text-gray-400">$</span>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={rate}
-                          onChange={e => updateRate(role, Number(e.target.value))}
-                          className="h-7 w-16 text-sm text-center px-1"
-                        />
+                        <Input type="number" min={1} value={rate} onChange={e => updateRate(role, Number(e.target.value))} className="h-7 w-16 text-sm text-center px-1" />
                         <span className="text-xs text-gray-400">/hr</span>
                       </div>
                     </div>
                   ))}
                   <div className="flex justify-end px-3 py-2 bg-gray-50">
-                    <button
-                      onClick={() => setTeamRates(DEFAULT_TEAM_RATES)}
-                      className="text-xs text-gray-400 hover:text-brand-orange"
-                    >
+                    <button onClick={() => setTeamRates(DEFAULT_TEAM_RATES)} className="text-xs text-gray-400 hover:text-brand-orange">
                       Reset to defaults
                     </button>
                   </div>
@@ -1023,13 +1441,7 @@ export default function App() {
               )}
             </div>
 
-            {/* Error */}
-            {error && (
-              <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-                <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </div>
-            )}
+
           </div>
 
           {/* ── Right column ── */}
@@ -1078,7 +1490,6 @@ export default function App() {
                         </button>
                       )}
                     </div>
-
                     {googleAuthStatus === 'connected' ? (
                       <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
                         <CheckCircle2 className="h-4 w-4 shrink-0" />Google account connected
@@ -1101,7 +1512,7 @@ export default function App() {
                         <Button size="sm" variant="outline" className="w-full text-xs h-8 border-brand-orange text-brand-orange hover:bg-brand-50" onClick={handleConnectGoogle} disabled={!googleClientId || !googleClientSecret}>
                           <Link2 className="h-3.5 w-3.5 mr-1.5" />Connect Google Account
                         </Button>
-                        <p className="text-xs text-gray-400">Add <code className="bg-gray-100 px-1 rounded">{`${window.location.origin}/api/google/callback`}</code> as redirect URI in Google Cloud Console.</p>
+                        <p className="text-xs text-gray-400">Add <code className="bg-gray-100 px-1 rounded">{`${window.location.origin}/api/google/callback`}</code> as redirect URI.</p>
                       </div>
                     ) : (
                       <p className="text-xs text-gray-400">Click Setup to connect Google for direct Google Docs export.</p>
@@ -1111,41 +1522,41 @@ export default function App() {
               )}
             </div>
 
-            {/* AI Effort Reduction — collapsible, default closed */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-              <button onClick={() => setShowAIConfig(!showAIConfig)} className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-2">
-                  <Bot className="h-4 w-4 text-brand-orange" />
-                  <span className="font-semibold text-sm">AI Effort Reduction</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {Object.values(aiConfig).some(v => v > 0) && (
-                    <Badge variant="default" className="text-xs">
-                      Avg {Math.round(Object.values(aiConfig).reduce((a, b) => a + b, 0) / 8)}%
-                    </Badge>
-                  )}
-                  <span className="text-xs text-gray-400">{showAIConfig ? 'Hide' : 'Configure'}</span>
-                </div>
-              </button>
-
-              {!showAIConfig && (
-                <p className="text-xs text-gray-400">
-                  Configure how much AI tools reduce dev hours per category.
-                  {Object.values(aiConfig).every(v => v === 0) && ' Currently set to 0% (no AI reduction).'}
-                </p>
-              )}
-
-              {showAIConfig && (
-                <Suspense fallback={<PanelLoader label="Loading AI settings..." />}>
-                  <AIConfigPanel config={aiConfig} onChange={setAiConfig} />
-                </Suspense>
-              )}
-            </div>
+            {/* AI Effort Reduction — only shown for Proposal mode */}
+            {documentType === 'proposal' && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+                <button onClick={() => setShowAIConfig(!showAIConfig)} className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <Bot className="h-4 w-4 text-brand-orange" />
+                    <span className="font-semibold text-sm">AI Effort Reduction</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {Object.values(aiConfig).some(v => v > 0) && (
+                      <Badge variant="default" className="text-xs">
+                        Avg {Math.round(Object.values(aiConfig).reduce((a, b) => a + b, 0) / 8)}%
+                      </Badge>
+                    )}
+                    <span className="text-xs text-gray-400">{showAIConfig ? 'Hide' : 'Configure'}</span>
+                  </div>
+                </button>
+                {!showAIConfig && (
+                  <p className="text-xs text-gray-400">
+                    Configure how much AI tools reduce dev hours per category.
+                    {Object.values(aiConfig).every(v => v === 0) && ' Currently set to 0% (no AI reduction).'}
+                  </p>
+                )}
+                {showAIConfig && (
+                  <Suspense fallback={<PanelLoader label="Loading AI settings..." />}>
+                    <AIConfigPanel config={aiConfig} onChange={setAiConfig} />
+                  </Suspense>
+                )}
+              </div>
+            )}
 
             {/* Generate */}
-            <Button className="w-full h-12 text-base gap-2" onClick={handleGenerate} disabled={false}>
-              <Sparkles className="h-5 w-5" />
-              Generate Proposal
+            <Button className="w-full h-12 text-base gap-2" onClick={handleGenerate}>
+              {generateIcon}
+              {generateLabel}
             </Button>
           </div>
         </div>

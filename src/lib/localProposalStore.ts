@@ -65,6 +65,7 @@ export function saveLocalProposal(params: {
 
   const saved: SavedProposal = {
     id: crypto.randomUUID(),
+    documentType: 'proposal',
     title: params.proposalData.project.name,
     description,
     requirementsHash: params.requirementsHash,

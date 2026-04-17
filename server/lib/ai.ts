@@ -265,7 +265,7 @@ async function callOpenAI(systemPrompt: string, userPrompt: string, apiKey: stri
   return data.choices[0]?.message?.content ?? ''
 }
 
-async function tryWithFallbacks(
+export async function tryWithFallbacks(
   systemPrompt: string,
   userPrompt: string,
   keys: { anthropicKey: string; geminiKey: string; openaiKey: string },

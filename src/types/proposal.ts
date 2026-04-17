@@ -186,12 +186,19 @@ export interface TeamRates {
 
 export interface SavedProposal {
   id: string
+  /** Defaults to 'proposal' for legacy records that predate this field */
+  documentType: 'proposal' | 'estimate' | 'concept'
   title: string
   description: string
   requirementsHash: string
-  proposalData: ProposalData
+  proposalData?: ProposalData
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  estimateData?: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  conceptData?: any
   projectInfo: ProjectInfo
   companyId: string
+  teamRates?: TeamRates
   totalCost: number
   timeline: string
   createdAt: string

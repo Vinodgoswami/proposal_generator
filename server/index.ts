@@ -2,6 +2,8 @@ import express from 'express'
 import cors from 'cors'
 import multer from 'multer'
 import { generateProposal } from './routes/ai.js'
+import { generateEstimate } from './routes/estimate.js'
+import { generateConcept } from './routes/concept.js'
 import { parseFile } from './routes/parse.js'
 import { getAuthUrl, handleCallback, getAuthStatus, revokeAuth, createGoogleDoc } from './routes/googleDocs.js'
 import { listProposals, getProposal, checkProposal, saveProposal, updateProposal, deleteProposal } from './routes/proposals.js'
@@ -15,6 +17,8 @@ app.use(express.json({ limit: '20mb' }))
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
 
 app.post('/api/generate', generateProposal)
+app.post('/api/generate-estimate', generateEstimate)
+app.post('/api/generate-concept', generateConcept)
 app.post('/api/parse', upload.single('file'), parseFile)
 
 // Google Docs routes

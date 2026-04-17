@@ -5,14 +5,21 @@ import { randomUUID } from 'crypto'
 
 export interface StoredProposal {
   id: string
+  documentType: 'proposal' | 'estimate' | 'concept'
   title: string
   description: string
   requirementsHash: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   proposalData: any
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  estimateData: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  conceptData: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   projectInfo: any
   companyId: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  teamRates: any
   totalCost: number
   timeline: string
   createdAt: string

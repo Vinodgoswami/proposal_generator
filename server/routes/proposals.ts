@@ -43,13 +43,25 @@ export async function checkProposal(req: Request, res: Response) {
 
 export async function saveProposal(req: Request, res: Response) {
   try {
-    const { title, description, requirementsHash, proposalData, projectInfo, companyId, totalCost, timeline } =
-      req.body as {
-        title: string; description: string; requirementsHash: string
-        proposalData: unknown; projectInfo: unknown; companyId: string
-        totalCost: number; timeline: string
-      }
-    const proposal = await proposalStore.create({ title, description, requirementsHash, proposalData, projectInfo, companyId, totalCost, timeline })
+    const {
+      title, description, requirementsHash,
+      proposalData, estimateData, conceptData,
+      projectInfo, companyId, teamRates,
+      totalCost, timeline,
+      documentType = 'proposal',
+    } = req.body as {
+      title: string; description: string; requirementsHash: string
+      proposalData?: unknown; estimateData?: unknown; conceptData?: unknown
+      projectInfo: unknown; companyId: string; teamRates?: unknown
+      totalCost: number; timeline: string; documentType?: string
+    }
+    const proposal = await proposalStore.create({
+      title, description, requirementsHash,
+      proposalData, estimateData, conceptData,
+      projectInfo, companyId, teamRates,
+      totalCost, timeline,
+      documentType: documentType as 'proposal' | 'estimate' | 'concept',
+    })
     res.status(201).json(proposal)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
@@ -59,9 +71,20 @@ export async function saveProposal(req: Request, res: Response) {
 
 export async function updateProposal(req: Request, res: Response) {
   try {
-    const { proposalData, projectInfo, totalCost, timeline, description } =
-      req.body as { proposalData: unknown; projectInfo: unknown; totalCost: number; timeline: string; description?: string }
-    const updated = await proposalStore.update(req.params.id, { proposalData, projectInfo, totalCost, timeline, ...(description !== undefined ? { description } : {}) })
+    const { proposalData, estimateData, conceptData, projectInfo, totalCost, timeline, description } =
+      req.body as {
+        proposalData?: unknown; estimateData?: unknown; conceptData?: unknown
+        projectInfo?: unknown; totalCost?: number; timeline?: string; description?: string
+      }
+    const updated = await proposalStore.update(req.params.id, {
+      ...(proposalData !== undefined ? { proposalData } : {}),
+      ...(estimateData !== undefined ? { estimateData } : {}),
+      ...(conceptData !== undefined ? { conceptData } : {}),
+      ...(projectInfo !== undefined ? { projectInfo } : {}),
+      ...(totalCost !== undefined ? { totalCost } : {}),
+      ...(timeline !== undefined ? { timeline } : {}),
+      ...(description !== undefined ? { description } : {}),
+    })
     if (!updated) return res.status(404).json({ error: 'Not found' })
     res.json(updated)
   } catch (error) {
