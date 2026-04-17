@@ -1,8 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { FileUpload } from '@/components/FileUpload'
-import { AIConfigPanel } from '@/components/AIConfigPanel'
-import { ProposalPreview } from '@/components/ProposalPreview'
-import { HistoryPage } from '@/components/HistoryPage'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -10,8 +7,6 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import type { ProposalData, AIConfig, ProjectInfo, TeamRates, CompanyConfig, SavedProposal } from '@/types/proposal'
-import { exportToDocx } from '@/lib/docxExporter'
-import { generateProposalHTML } from '@/lib/htmlExporter'
 import { COMPANIES, DEFAULT_COMPANY } from '@/lib/companies'
 import { hashRequirements, checkProposalByHash, getProposalById, saveProposalToDb } from '@/lib/proposalApi'
 import {
@@ -19,6 +14,21 @@ import {
   Key, AlertCircle, CheckCircle2, ExternalLink, Link2, Link2Off,
   Bot, Users, Pencil, Eye, Building2, History, RefreshCw, Copy, Globe,
 } from 'lucide-react'
+
+const AIConfigPanel = lazy(async () => {
+  const mod = await import('@/components/AIConfigPanel')
+  return { default: mod.AIConfigPanel }
+})
+
+const ProposalPreview = lazy(async () => {
+  const mod = await import('@/components/ProposalPreview')
+  return { default: mod.ProposalPreview }
+})
+
+const HistoryPage = lazy(async () => {
+  const mod = await import('@/components/HistoryPage')
+  return { default: mod.HistoryPage }
+})
 
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 
@@ -54,12 +64,21 @@ function defaultProjectInfo(company: CompanyConfig): ProjectInfo {
 
 type AppStep = 'input' | 'generating' | 'preview' | 'history' | 'share'
 
+function PanelLoader({ label }: { label: string }) {
+  return (
+    <div className="flex items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-sm text-gray-500">
+      {label}
+    </div>
+  )
+}
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [company, setCompany] = useState<CompanyConfig>(DEFAULT_COMPANY)
   const [step, setStep] = useState<AppStep>('input')
   const [uploadedRequirements, setUploadedRequirements] = useState('')
+  const [uploadedRequirementsWordCount, setUploadedRequirementsWordCount] = useState(0)
   const [typedRequirements, setTypedRequirements] = useState('')
   const [projectInfo, setProjectInfo] = useState<ProjectInfo>(defaultProjectInfo(DEFAULT_COMPANY))
   const [aiConfig, setAiConfig] = useState<AIConfig>(DEFAULT_AI_CONFIG)
@@ -110,9 +129,9 @@ export default function App() {
   }
 
   const requirements = buildRequirements()
-  const uploadedWordCount = uploadedRequirements.split(/\s+/).filter(Boolean).length
+  const uploadedWordCount = uploadedRequirementsWordCount
   const typedWordCount = typedRequirements.split(/\s+/).filter(Boolean).length
-  const totalWordCount = requirements.split(/\s+/).filter(Boolean).length
+  const totalWordCount = uploadedWordCount + typedWordCount
 
   function handleCompanyChange(id: string) {
     const c = COMPANIES.find(x => x.id === id) ?? DEFAULT_COMPANY
@@ -217,7 +236,10 @@ export default function App() {
   async function handleExport() {
     if (!proposal) return
     setIsExporting(true)
-    try { await exportToDocx(proposal, projectInfo, company) } finally { setIsExporting(false) }
+    try {
+      const { exportToDocx } = await import('@/lib/docxExporter')
+      await exportToDocx(proposal, projectInfo, company)
+    } finally { setIsExporting(false) }
   }
 
   // ── Share link detection on mount ──────────────────────────────────────────
@@ -309,6 +331,7 @@ export default function App() {
     if (!proposal) return
     setIsCreatingDoc(true)
     try {
+      const { generateProposalHTML } = await import('@/lib/htmlExporter')
       const html = generateProposalHTML(proposal, projectInfo, company)
       const res = await fetch('/api/google/create-doc', {
         method: 'POST',
@@ -358,6 +381,7 @@ export default function App() {
                   onClick={async () => {
                     setIsCreatingDoc(true)
                     try {
+                      const { generateProposalHTML } = await import('@/lib/htmlExporter')
                       const html = generateProposalHTML(saved.proposalData, saved.projectInfo, shareCompany)
                       const res = await fetch('/api/google/create-doc', {
                         method: 'POST',
@@ -409,7 +433,10 @@ export default function App() {
                 size="sm"
                 onClick={async () => {
                   setIsExporting(true)
-                  try { await exportToDocx(saved.proposalData, saved.projectInfo, shareCompany) } finally { setIsExporting(false) }
+                  try {
+                    const { exportToDocx } = await import('@/lib/docxExporter')
+                    await exportToDocx(saved.proposalData, saved.projectInfo, shareCompany)
+                  } finally { setIsExporting(false) }
                 }}
                 disabled={isExporting}
               >
@@ -423,7 +450,9 @@ export default function App() {
         </div>
         <div className="max-w-5xl mx-auto px-4 py-8">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10">
-            <ProposalPreview data={saved.proposalData} info={saved.projectInfo} company={shareCompany} />
+            <Suspense fallback={<PanelLoader label="Loading shared proposal..." />}>
+              <ProposalPreview data={saved.proposalData} info={saved.projectInfo} company={shareCompany} />
+            </Suspense>
           </div>
         </div>
       </div>
@@ -436,28 +465,31 @@ export default function App() {
 
   if (step === 'history') {
     return (
-      <HistoryPage
-        onBack={() => setStep('input')}
-        company={company}
-        googleAuthStatus={googleAuthStatus}
-        onOpenInGoogleDocs={async (proposalData, info, comp) => {
-          setIsCreatingDoc(true)
-          try {
-            const html = generateProposalHTML(proposalData, info, comp)
-            const res = await fetch('/api/google/create-doc', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ html, title: proposalData.project.name }),
-            })
-            if (!res.ok) { const err = await res.json() as { error: string }; throw new Error(err.error) }
-            const { docUrl } = await res.json() as { docUrl: string }
-            window.open(docUrl, '_blank')
-          } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to create Google Doc')
-          } finally { setIsCreatingDoc(false) }
-        }}
-        isCreatingDoc={isCreatingDoc}
-      />
+      <Suspense fallback={<div style={brandVars} className="min-h-screen bg-gray-50 p-6"><PanelLoader label="Loading history..." /></div>}>
+        <HistoryPage
+          onBack={() => setStep('input')}
+          company={company}
+          googleAuthStatus={googleAuthStatus}
+          onOpenInGoogleDocs={async (proposalData, info, comp) => {
+            setIsCreatingDoc(true)
+            try {
+              const { generateProposalHTML } = await import('@/lib/htmlExporter')
+              const html = generateProposalHTML(proposalData, info, comp)
+              const res = await fetch('/api/google/create-doc', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ html, title: proposalData.project.name }),
+              })
+              if (!res.ok) { const err = await res.json() as { error: string }; throw new Error(err.error) }
+              const { docUrl } = await res.json() as { docUrl: string }
+              window.open(docUrl, '_blank')
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'Failed to create Google Doc')
+            } finally { setIsCreatingDoc(false) }
+          }}
+          isCreatingDoc={isCreatingDoc}
+        />
+      </Suspense>
     )
   }
 
@@ -619,13 +651,15 @@ export default function App() {
         {/* Proposal */}
         <div className="max-w-5xl mx-auto px-4 py-8">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10">
-            <ProposalPreview
-              data={proposal}
-              info={projectInfo}
-              company={company}
-              isEditing={isEditing}
-              onUpdate={setProposal}
-            />
+            <Suspense fallback={<PanelLoader label="Loading proposal preview..." />}>
+              <ProposalPreview
+                data={proposal}
+                info={projectInfo}
+                company={company}
+                isEditing={isEditing}
+                onUpdate={setProposal}
+              />
+            </Suspense>
           </div>
         </div>
       </div>
@@ -721,7 +755,13 @@ export default function App() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-gray-700">Upload Files</Label>
-                  <FileUpload onFilesContent={setUploadedRequirements} isLoading={false} />
+                  <FileUpload
+                    onFilesContent={({ combinedText, wordCount }) => {
+                      setUploadedRequirements(combinedText)
+                      setUploadedRequirementsWordCount(wordCount)
+                    }}
+                    isLoading={false}
+                  />
                   <p className="text-xs text-gray-500">
                     Upload one file or multiple files. All successfully parsed files are combined and used in the proposal.
                   </p>
@@ -936,7 +976,11 @@ export default function App() {
                 </p>
               )}
 
-              {showAIConfig && <AIConfigPanel config={aiConfig} onChange={setAiConfig} />}
+              {showAIConfig && (
+                <Suspense fallback={<PanelLoader label="Loading AI settings..." />}>
+                  <AIConfigPanel config={aiConfig} onChange={setAiConfig} />
+                </Suspense>
+              )}
             </div>
 
             {/* Generate */}

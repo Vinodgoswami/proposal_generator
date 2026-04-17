@@ -11,7 +11,7 @@ interface UploadedDoc {
 }
 
 interface FileUploadProps {
-  onFilesContent: (combinedText: string) => void
+  onFilesContent: (payload: { combinedText: string; wordCount: number }) => void
   isLoading: boolean
 }
 
@@ -40,11 +40,12 @@ export function FileUpload({ onFilesContent, isLoading }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   function emitCombined(updated: UploadedDoc[]) {
-    const combined = updated
-      .filter(d => d.status === 'done')
+    const doneDocs = updated.filter(d => d.status === 'done')
+    const combined = doneDocs
       .map(d => `=== ${d.name} ===\n${d.text}`)
       .join('\n\n')
-    onFilesContent(combined)
+    const wordCount = doneDocs.reduce((total, doc) => total + doc.text.split(/\s+/).filter(Boolean).length, 0)
+    onFilesContent({ combinedText: combined, wordCount })
   }
 
   const processFiles = useCallback(async (files: File[]) => {
