@@ -3,9 +3,31 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[functions]
+  node_bundler = "esbuild"
+
+[functions."generate"]
+  timeout = 60
+
+[functions."generate-estimate"]
+  timeout = 60
+
+[functions."generate-concept"]
+  timeout = 60
+
 [[redirects]]
   from = "/api/generate"
   to = "/.netlify/functions/generate"
+  status = 200
+
+[[redirects]]
+  from = "/api/generate-estimate"
+  to = "/.netlify/functions/generate-estimate"
+  status = 200
+
+[[redirects]]
+  from = "/api/generate-concept"
+  to = "/.netlify/functions/generate-concept"
   status = 200
 
 [[redirects]]
