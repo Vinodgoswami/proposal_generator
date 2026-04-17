@@ -1,5 +1,7 @@
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages'
 const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions'
+const GROQ_MODEL = 'llama-3.3-70b-versatile'
 
 interface CompanyProfileInput {
   id: string
@@ -265,12 +267,40 @@ async function callOpenAI(systemPrompt: string, userPrompt: string, apiKey: stri
   return data.choices[0]?.message?.content ?? ''
 }
 
+async function callGroq(systemPrompt: string, userPrompt: string, apiKey: string): Promise<string> {
+  const res = await fetch(GROQ_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      max_tokens: 8000,
+      temperature: 0.3,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Groq API error ${res.status}: ${err}`)
+  }
+
+  const data = await res.json() as { choices: Array<{ message: { content: string } }> }
+  return data.choices[0]?.message?.content ?? ''
+}
+
 export async function tryWithFallbacks(
   systemPrompt: string,
   userPrompt: string,
   keys: { anthropicKey: string; geminiKey: string; openaiKey: string },
 ): Promise<{ text: string; provider: string }> {
   const { anthropicKey, geminiKey, openaiKey } = keys
+  const groqKey = process.env.GROQ_API_KEY ?? ''
 
   if (anthropicKey?.trim()) {
     try {
@@ -299,6 +329,15 @@ export async function tryWithFallbacks(
     }
   }
 
+  if (groqKey.trim()) {
+    try {
+      const text = await callGroq(systemPrompt, userPrompt, groqKey)
+      return { text, provider: 'groq' }
+    } catch (error) {
+      console.warn('Groq failed:', (error as Error).message)
+    }
+  }
+
   throw new Error('All AI providers failed or no API keys provided. Please check your keys and try again.')
 }
 
@@ -309,7 +348,7 @@ export async function generateProposalFromBody(body: GenerateProposalBody): Prom
     throw new Error('Requirements are required')
   }
 
-  if (!anthropicKey?.trim() && !geminiKey?.trim() && !openaiKey?.trim()) {
+  if (!anthropicKey?.trim() && !geminiKey?.trim() && !openaiKey?.trim() && !process.env.GROQ_API_KEY?.trim()) {
     throw new Error('Please provide at least one API key (Anthropic, Gemini, or OpenAI)')
   }
 

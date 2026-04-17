@@ -15,6 +15,7 @@ import {
   saveProposalToDb, saveEstimateToDb, saveConceptToDb,
   updateEstimateInDb, updateConceptInDb,
 } from '@/lib/proposalApi'
+import { encryptKeys } from '@/lib/keyEncryption'
 import {
   FileText, Type, Sparkles, Download, ChevronLeft,
   Key, AlertCircle, CheckCircle2, ExternalLink, Link2, Link2Off,
@@ -286,6 +287,7 @@ export default function App() {
     ])
 
     try {
+      const encKeys = await encryptKeys({ anthropicKey, geminiKey, openaiKey })
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -296,14 +298,12 @@ export default function App() {
           teamRates,
           companyProfile: company,
           styleReferenceText,
-          anthropicKey,
-          geminiKey,
-          openaiKey,
+          ...encKeys,
         }),
       })
       clearInterval(interval)
-      if (!res.ok) { const err = await res.json() as { error: string }; throw new Error(err.error) }
-      const data = await res.json() as { proposal: ProposalData; provider: string }
+      const data = await res.json().catch(() => { throw new Error('No response from server — the request may have timed out. Try again.') }) as { proposal: ProposalData; provider: string; error?: string }
+      if (!res.ok || data.error) throw new Error(data.error ?? 'Generation failed')
       setProgress(100); setProgressMsg('Proposal ready!')
       setProposal(data.proposal); setAiProvider(data.provider)
       setIsEditing(false)
@@ -345,6 +345,7 @@ export default function App() {
     ])
 
     try {
+      const encKeys = await encryptKeys({ anthropicKey, geminiKey, openaiKey })
       const res = await fetch('/api/generate-estimate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -353,14 +354,12 @@ export default function App() {
           projectInfo: { ...projectInfo, companySnapshot: company },
           teamRates,
           companyProfile: company,
-          anthropicKey,
-          geminiKey,
-          openaiKey,
+          ...encKeys,
         }),
       })
       clearInterval(interval)
-      if (!res.ok) { const err = await res.json() as { error: string }; throw new Error(err.error) }
-      const data = await res.json() as { estimate: EstimateData; provider: string }
+      const data = await res.json().catch(() => { throw new Error('No response from server — the request may have timed out. Try again.') }) as { estimate: EstimateData; provider: string; error?: string }
+      if (!res.ok || data.error) throw new Error(data.error ?? 'Estimate generation failed')
       setProgress(100); setProgressMsg('Estimate ready!')
       setEstimate(data.estimate)
       setAiProvider(data.provider)
@@ -400,6 +399,7 @@ export default function App() {
     ])
 
     try {
+      const encKeys = await encryptKeys({ anthropicKey, geminiKey, openaiKey })
       const res = await fetch('/api/generate-concept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -407,14 +407,12 @@ export default function App() {
           requirements,
           projectInfo: { ...projectInfo, companySnapshot: company },
           companyProfile: company,
-          anthropicKey,
-          geminiKey,
-          openaiKey,
+          ...encKeys,
         }),
       })
       clearInterval(interval)
-      if (!res.ok) { const err = await res.json() as { error: string }; throw new Error(err.error) }
-      const data = await res.json() as { concept: ConceptData; provider: string }
+      const data = await res.json().catch(() => { throw new Error('No response from server — the request may have timed out. Try again.') }) as { concept: ConceptData; provider: string; error?: string }
+      if (!res.ok || data.error) throw new Error(data.error ?? 'Concept generation failed')
       setProgress(100); setProgressMsg('Concept ready!')
       setConcept(data.concept)
       setAiProvider(data.provider)

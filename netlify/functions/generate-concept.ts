@@ -1,4 +1,5 @@
 import { generateConceptFromBody, type GenerateConceptBody } from '../../server/lib/concept.js'
+import { decryptKeys } from '../../server/lib/keyDecryption.js'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,7 +43,7 @@ export default async function handler(req: Request): Promise<Response> {
     writer.write(enc.encode(' ')).catch(() => clearInterval(keepAlive))
   }, 5000)
 
-  generateConceptFromBody(body)
+  generateConceptFromBody(decryptKeys(body))
     .then(async result => {
       clearInterval(keepAlive)
       await writer.write(enc.encode(JSON.stringify(result)))

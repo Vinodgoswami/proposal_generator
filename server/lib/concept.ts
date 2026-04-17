@@ -240,7 +240,7 @@ export async function generateConceptFromBody(body: GenerateConceptBody): Promis
   if (!requirements?.trim()) {
     throw new Error('Requirements are required')
   }
-  if (!anthropicKey?.trim() && !geminiKey?.trim() && !openaiKey?.trim()) {
+  if (!anthropicKey?.trim() && !geminiKey?.trim() && !openaiKey?.trim() && !process.env.GROQ_API_KEY?.trim()) {
     throw new Error('Please provide at least one API key')
   }
 
