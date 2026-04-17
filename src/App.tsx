@@ -241,11 +241,7 @@ export default function App() {
       setError('Please enter a project name.')
       return false
     }
-    if (!anthropicKey.trim() && !geminiKey.trim() && !openaiKey.trim()) {
-      setError('Please provide at least one API key (Anthropic, Gemini, or OpenAI).')
-      setShowKeys(true)
-      return false
-    }
+    // Key validation is handled server-side (Groq key is set via env var)
     return true
   }
 
@@ -1472,7 +1468,7 @@ export default function App() {
                     <Label htmlFor="openaiKey">OpenAI (GPT-4o) — Fallback 2</Label>
                     <Input id="openaiKey" type="password" placeholder="sk-…" value={openaiKey} onChange={e => setOpenaiKey(e.target.value)} />
                   </div>
-                  <p className="text-xs text-gray-400">Tries Anthropic → Gemini → OpenAI in order. Keys are session-only, never stored.</p>
+                  <p className="text-xs text-gray-400">Tries Anthropic → Gemini → OpenAI → Groq (server) in order. Client keys are session-only, never stored. Groq runs automatically as a free fallback — no key required here.</p>
 
                   {/* Google Docs */}
                   <div className="border-t border-gray-100 pt-3 space-y-2">
